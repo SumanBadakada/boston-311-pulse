@@ -1,4 +1,7 @@
 """311 Pulse: streamlit run app.py"""
+import os
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
@@ -7,6 +10,17 @@ from pulse.report import render
 from pulse.writer import answer_question, write_brief
 
 st.set_page_config(page_title="311 Pulse: Boston", layout="wide")
+
+# Keys come from Streamlit secrets on Community Cloud (App settings -> Secrets), or the environment locally.
+for key in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY"):
+    try:
+        if key in st.secrets and not os.environ.get(key):
+            os.environ[key] = st.secrets[key]
+    except Exception:  # no secrets file locally
+        pass
+
+LIVE, SAMPLE = Path("data/live_311.csv.gz"), Path("data/sample_311.csv.gz")
+MAX_QUESTIONS = 10  # per visitor session, protects the free AI quota on the public app
 
 
 @st.cache_data(show_spinner="Loading 311 data...")
@@ -17,7 +31,11 @@ def get_data(src) -> pd.DataFrame:
 with st.sidebar:
     st.header("Data")
     upload = st.file_uploader("Cleaned 311 CSV (optional)", type=["csv", "gz"])
-    df = get_data(upload if upload is not None else "data/sample_311.csv.gz")
+    default = LIVE if LIVE.exists() else SAMPLE
+    df = get_data(upload if upload is not None else str(default))
+    if upload is None:
+        st.caption("Live data, refreshed daily from Analyze Boston" if default == LIVE
+                   else "Sample data (Sept to Dec 2025)")
     lo, hi = df.open_date.min().date(), df.open_date.max().date()
     earliest = min(hi, (pd.Timestamp(lo) + pd.Timedelta(days=35)).date())  # needs a 4-week baseline
     asof = st.date_input("Week ending", value=hi, min_value=earliest, max_value=hi)
@@ -39,7 +57,12 @@ st.caption(f"Written by: {source}. Every figure is computed from the data; the A
 
 q = st.text_input("Ask a follow-up about this week")
 if q:
-    st.write(answer_question(q, b))
+    asked = st.session_state.get("asked", 0)
+    if asked >= MAX_QUESTIONS:
+        st.write("You've reached the question limit for this session. Refresh the page to start again.")
+    else:
+        st.session_state["asked"] = asked + 1
+        st.write(answer_question(q, b))
 
 left, right = st.columns(2)
 with left:

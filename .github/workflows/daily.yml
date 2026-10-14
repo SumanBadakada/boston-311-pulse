@@ -1,0 +1,45 @@
+name: daily brief
+on:
+  schedule:
+    - cron: "17 11 * * *"   # 7:17am Boston (EDT); 6:17am in winter
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["pulse/**", ".github/workflows/daily.yml"]
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency: { group: daily, cancel-in-progress: false }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pandas numpy google-genai
+      - name: Pull the last 6 weeks of 311 data
+        run: python -m pulse.live --days 42 --out data/live_311.csv.gz
+      - name: Build the brief
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          mkdir -p site
+          python -m pulse --data data/live_311.csv.gz --out site/index.html
+      - name: Save the data for the Streamlit app
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add data/live_311.csv.gz
+          git commit -m "Daily 311 data refresh [skip ci]" || echo "no change"
+          git pull --rebase -q && git push
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: "${{ steps.d.outputs.page_url }}" }
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4
