@@ -1,0 +1,684 @@
+{
+ "legacy_2026": {
+  "total": 189709,
+  "fields": [
+   [
+    "_id",
+    "int"
+   ],
+   [
+    "case_enquiry_id",
+    "numeric"
+   ],
+   [
+    "open_dt",
+    "timestamp"
+   ],
+   [
+    "sla_target_dt",
+    "timestamp"
+   ],
+   [
+    "closed_dt",
+    "timestamp"
+   ],
+   [
+    "on_time",
+    "text"
+   ],
+   [
+    "case_status",
+    "text"
+   ],
+   [
+    "closure_reason",
+    "text"
+   ],
+   [
+    "case_title",
+    "text"
+   ],
+   [
+    "subject",
+    "text"
+   ],
+   [
+    "reason",
+    "text"
+   ],
+   [
+    "type",
+    "text"
+   ],
+   [
+    "queue",
+    "text"
+   ],
+   [
+    "department",
+    "text"
+   ],
+   [
+    "submitted_photo",
+    "text"
+   ],
+   [
+    "closed_photo",
+    "text"
+   ],
+   [
+    "location",
+    "text"
+   ],
+   [
+    "fire_district",
+    "text"
+   ],
+   [
+    "pwd_district",
+    "text"
+   ],
+   [
+    "city_council_district",
+    "text"
+   ],
+   [
+    "police_district",
+    "text"
+   ],
+   [
+    "neighborhood",
+    "text"
+   ],
+   [
+    "neighborhood_services_district",
+    "text"
+   ],
+   [
+    "ward",
+    "text"
+   ],
+   [
+    "precinct",
+    "text"
+   ],
+   [
+    "location_street_name",
+    "text"
+   ],
+   [
+    "location_zipcode",
+    "numeric"
+   ],
+   [
+    "latitude",
+    "numeric"
+   ],
+   [
+    "longitude",
+    "numeric"
+   ],
+   [
+    "geom_4326",
+    "text"
+   ],
+   [
+    "source",
+    "text"
+   ]
+  ],
+  "records": [
+   {
+    "_id": 1,
+    "case_enquiry_id": 101006726212,
+    "open_dt": "2026-07-30T19:13:06",
+    "sla_target_dt": null,
+    "closed_dt": null,
+    "on_time": "ONTIME",
+    "case_status": "Open",
+    "closure_reason": null,
+    "case_title": "Abandoned Bicycle",
+    "subject": "Mayor's 24 Hour Hotline",
+    "reason": "Abandoned Bicycle",
+    "type": "Abandoned Bicycle",
+    "queue": "BTDT_Abandoned Bicycle",
+    "department": "BTDT",
+    "submitted_photo": null,
+    "closed_photo": null,
+    "location": "INTERSECTION of Albion St &amp; Clifton St  Roxbury  MA",
+    "fire_district": "7",
+    "pwd_district": "03",
+    "city_council_district": "3",
+    "police_district": "B2",
+    "neighborhood": "Roxbury",
+    "neighborhood_services_district": "13",
+    "ward": "8",
+    "precinct": "0806",
+    "location_street_name": "INTERSECTION Albion St &amp; Clifton St",
+    "location_zipcode": null,
+    "latitude": 42.32230309901924,
+    "longitude": -71.07048920339788,
+    "geom_4326": "0101000020E610000029D425E582C451C0F2D75A3A41294540",
+    "source": "Citizens Connect App"
+   },
+   {
+    "_id": 2,
+    "case_enquiry_id": 101006726213,
+    "open_dt": "2026-07-30T19:13:27",
+    "sla_target_dt": "2026-08-03T08:30:00",
+    "closed_dt": null,
+    "on_time": "OVERDUE",
+    "case_status": "Open",
+    "closure_reason": null,
+    "case_title": "Parking Enforcement",
+    "subject": "Transportation - Traffic Division",
+    "reason": "Enforcement & Abandoned Vehicles",
+    "type": "Parking Enforcement",
+    "queue": "BTDT_Parking Enforcement",
+    "department": "BTDT",
+    "submitted_photo": null,
+    "closed_photo": null,
+    "location": "62 Condor St  East Boston  MA  02128",
+    "fire_district": "1",
+    "pwd_district": "09",
+    "city_council_district": "1",
+    "police_district": "A7",
+    "neighborhood": "East Boston",
+    "neighborhood_services_district": "1",
+    "ward": "Ward 1",
+    "precinct": "0108",
+    "location_street_name": "62 Condor St",
+    "location_zipcode": 2128,
+    "latitude": 42.38275199967162,
+    "longitude": -71.03785800092463,
+    "geom_4326": "0101000020E61000003FF7F6436CC251C0BB887C04FE304540",
+    "source": "Citizens Connect App"
+   },
+   {
+    "_id": 3,
+    "case_enquiry_id": 101006617414,
+    "open_dt": "2026-04-20T07:30:00",
+    "sla_target_dt": null,
+    "closed_dt": null,
+    "on_time": "ONTIME",
+    "case_status": "Open",
+    "closure_reason": null,
+    "case_title": "Public Works General Request",
+    "subject": "Public Works Department",
+    "reason": "Administrative & General Requests",
+    "type": "Public Works General Request",
+    "queue": "PWDx_Sidewalk Repair",
+    "department": "PWDx",
+    "submitted_photo": null,
+    "closed_photo": null,
+    "location": "5 Eunice St  Dorchester  MA  02121",
+    "fire_district": "7",
+    "pwd_district": "03",
+    "city_council_district": "4",
+    "police_district": "C11",
+    "neighborhood": "Dorchester",
+    "neighborhood_services_district": "8",
+    "ward": "Ward 15",
+    "precinct": "1502",
+    "location_street_name": "5 Eunice St",
+    "location_zipcode": 2121,
+    "latitude": 42.30458000000446,
+    "longitude": -71.06991000123222,
+    "geom_4326": "0101000020E61000002A3DCC6779C451C07584397AFC264540",
+    "source": "Constituent Call"
+   }
+  ]
+ },
+ "legacy_2025": {
+  "total": 276093,
+  "fields": [
+   [
+    "_id",
+    "int"
+   ],
+   [
+    "case_enquiry_id",
+    "text"
+   ],
+   [
+    "open_dt",
+    "text"
+   ],
+   [
+    "sla_target_dt",
+    "text"
+   ],
+   [
+    "closed_dt",
+    "text"
+   ],
+   [
+    "on_time",
+    "text"
+   ],
+   [
+    "case_status",
+    "text"
+   ],
+   [
+    "closure_reason",
+    "text"
+   ],
+   [
+    "case_title",
+    "text"
+   ],
+   [
+    "subject",
+    "text"
+   ],
+   [
+    "reason",
+    "text"
+   ],
+   [
+    "type",
+    "text"
+   ],
+   [
+    "queue",
+    "text"
+   ],
+   [
+    "department",
+    "text"
+   ],
+   [
+    "submitted_photo",
+    "text"
+   ],
+   [
+    "closed_photo",
+    "text"
+   ],
+   [
+    "location",
+    "text"
+   ],
+   [
+    "fire_district",
+    "text"
+   ],
+   [
+    "pwd_district",
+    "text"
+   ],
+   [
+    "city_council_district",
+    "text"
+   ],
+   [
+    "police_district",
+    "text"
+   ],
+   [
+    "neighborhood",
+    "text"
+   ],
+   [
+    "neighborhood_services_district",
+    "text"
+   ],
+   [
+    "ward",
+    "text"
+   ],
+   [
+    "precinct",
+    "text"
+   ],
+   [
+    "location_street_name",
+    "text"
+   ],
+   [
+    "location_zipcode",
+    "text"
+   ],
+   [
+    "latitude",
+    "text"
+   ],
+   [
+    "longitude",
+    "text"
+   ],
+   [
+    "geom_4326",
+    "text"
+   ],
+   [
+    "source",
+    "text"
+   ]
+  ],
+  "records": [
+   {
+    "_id": 1,
+    "case_enquiry_id": "101005839033",
+    "open_dt": "2025-01-02 09:50:33.593",
+    "sla_target_dt": "2025-01-03 09:50:49",
+    "closed_dt": "2025-01-02 10:37:03.13",
+    "on_time": "ONTIME",
+    "case_status": "Closed",
+    "closure_reason": "Case Closed. Closed date : Thu Jan 02 10:37:03 EST 2025 Resolved",
+    "case_title": "Requests for Street Cleaning",
+    "subject": "Public Works Department",
+    "reason": "Street Cleaning",
+    "type": "Requests for Street Cleaning",
+    "queue": "PWDx_District 10A: Roxbury",
+    "department": "PWDx",
+    "submitted_photo": null,
+    "closed_photo": null,
+    "location": "115 Jersey St  Boston  MA  02215",
+    "fire_district": "4",
+    "pwd_district": "10A",
+    "city_council_district": "8",
+    "police_district": "D4",
+    "neighborhood": "Fenway / Kenmore / Audubon Circle / Longwood",
+    "neighborhood_services_district": "14",
+    "ward": "Ward 5",
+    "precinct": "0502A",
+    "location_street_name": "115 Jersey St",
+    "location_zipcode": "02215",
+    "latitude": "42.34264999984833",
+    "longitude": "-71.09711000125674",
+    "geom_4326": "0101000020E6100000C8E0DD0C37C651C057A987F4DB2B4540",
+    "source": "Citizens Connect App"
+   },
+   {
+    "_id": 2,
+    "case_enquiry_id": "101005839139",
+    "open_dt": "2025-01-02 10:43:00",
+    "sla_target_dt": "2025-01-16 10:43:41",
+    "closed_dt": "2025-01-06 10:21:56.57",
+    "on_time": "ONTIME",
+    "case_status": "Closed",
+    "closure_reason": "Case Closed. Closed date : 2025-01-06 10:21:56.57 Duplicate of Existing Case Duplicate of existing case see #107908",
+    "case_title": "Sign Repair",
+    "subject": "Transportation - Traffic Division",
+    "reason": "Signs & Signals",
+    "type": "Sign Repair",
+    "queue": "BTDT_Sign Shop_Sign Installation",
+    "department": "BTDT",
+    "submitted_photo": null,
+    "closed_photo": null,
+    "location": "INTERSECTION of Kilmarnock St &amp; Boylston St  Boston  MA",
+    "fire_district": "4",
+    "pwd_district": "10A",
+    "city_council_district": "7",
+    "police_district": "D4",
+    "neighborhood": "Fenway / Kenmore / Audubon Circle / Longwood",
+    "neighborhood_services_district": "14",
+    "ward": "5",
+    "precinct": "0502A",
+    "location_street_name": "INTERSECTION Kilmarnock St &amp; Boylston St",
+    "location_zipcode": null,
+    "latitude": "42.34396865438232",
+    "longitude": "-71.10001301542482",
+    "geom_4326": "0101000020E6100000229BFD9C66C651C0EAB5342A072C4540",
+    "source": "Employee Generated"
+   },
+   {
+    "_id": 3,
+    "case_enquiry_id": "101005839494",
+    "open_dt": "2025-01-02 14:26:00",
+    "sla_target_dt": "2025-01-16 14:26:30",
+    "closed_dt": "2025-03-27 09:39:58.59",
+    "on_time": "OVERDUE",
+    "case_status": "Closed",
+    "closure_reason": "Case Closed. Closed date : 2025-03-27 09:39:58.59 Case Resolved",
+    "case_title": "Sign Repair",
+    "subject": "Transportation - Traffic Division",
+    "reason": "Signs & Signals",
+    "type": "Sign Repair",
+    "queue": "BTDT_Sign Shop_Sign Installation",
+    "department": "BTDT",
+    "submitted_photo": null,
+    "closed_photo": null,
+    "location": "INTERSECTION of Kilmarnock St &amp; Boylston St  Boston  MA",
+    "fire_district": "4",
+    "pwd_district": "10A",
+    "city_council_district": "7",
+    "police_district": "D4",
+    "neighborhood": "Fenway / Kenmore / Audubon Circle / Longwood",
+    "neighborhood_services_district": "14",
+    "ward": "5",
+    "precinct": "0502A",
+    "location_street_name": "INTERSECTION Kilmarnock St &amp; Boylston St",
+    "location_zipcode": null,
+    "latitude": "42.34396865438232",
+    "longitude": "-71.10001301542482",
+    "geom_4326": "0101000020E6100000229BFD9C66C651C0EAB5342A072C4540",
+    "source": "Citizens Connect App"
+   }
+  ]
+ },
+ "new_system": {
+  "total": 69515,
+  "fields": [
+   [
+    "_id",
+    "int"
+   ],
+   [
+    "case_id",
+    "text"
+   ],
+   [
+    "open_date",
+    "text"
+   ],
+   [
+    "case_topic",
+    "text"
+   ],
+   [
+    "service_name",
+    "text"
+   ],
+   [
+    "assigned_department",
+    "text"
+   ],
+   [
+    "assigned_team",
+    "text"
+   ],
+   [
+    "case_status",
+    "text"
+   ],
+   [
+    "closure_reason",
+    "text"
+   ],
+   [
+    "closure_comments",
+    "text"
+   ],
+   [
+    "close_date",
+    "text"
+   ],
+   [
+    "target_close_date",
+    "text"
+   ],
+   [
+    "on_time",
+    "text"
+   ],
+   [
+    "report_source",
+    "text"
+   ],
+   [
+    "full_address",
+    "text"
+   ],
+   [
+    "street_number",
+    "text"
+   ],
+   [
+    "street_name",
+    "text"
+   ],
+   [
+    "zip_code",
+    "text"
+   ],
+   [
+    "neighborhood",
+    "text"
+   ],
+   [
+    "public_works_district",
+    "text"
+   ],
+   [
+    "city_council_district",
+    "text"
+   ],
+   [
+    "fire_district",
+    "text"
+   ],
+   [
+    "police_district",
+    "text"
+   ],
+   [
+    "ward",
+    "text"
+   ],
+   [
+    "precinct",
+    "text"
+   ],
+   [
+    "submitted_photo",
+    "text"
+   ],
+   [
+    "closed_photo",
+    "text"
+   ],
+   [
+    "longitude",
+    "text"
+   ],
+   [
+    "latitude",
+    "text"
+   ]
+  ],
+  "records": [
+   {
+    "_id": 1,
+    "case_id": "BCS-00245057",
+    "open_date": "2026-07-06 06:30:51.879147+00",
+    "case_topic": "Litter & Debris",
+    "service_name": "Litter & Debris",
+    "assigned_department": "Public Works Department (PWD)",
+    "assigned_team": "PWD Code Enforcement (BEAM)",
+    "case_status": "Closed",
+    "closure_reason": "Resolved",
+    "closure_comments": "Property has been cited",
+    "close_date": "2026-07-06 07:19:07+00",
+    "target_close_date": "2026-07-07 06:30:51.879147+00",
+    "on_time": "ONTIME",
+    "report_source": "BOS311",
+    "full_address": "33-37 Hancock St, Boston, MA 02125",
+    "street_number": "33",
+    "street_name": "Hancock St",
+    "zip_code": "02125",
+    "neighborhood": "Dorchester",
+    "public_works_district": "3",
+    "city_council_district": "4",
+    "fire_district": "7",
+    "police_district": "C11",
+    "ward": "15",
+    "precinct": "01",
+    "submitted_photo": null,
+    "closed_photo": null,
+    "longitude": "-71.06581785",
+    "latitude": "42.31433003"
+   },
+   {
+    "_id": 2,
+    "case_id": "BCS-00241410",
+    "open_date": "2026-07-02 08:38:30.433745+00",
+    "case_topic": "Litter & Debris",
+    "service_name": "Litter & Debris",
+    "assigned_department": "Public Works Department (PWD)",
+    "assigned_team": "PWD Highway (BEAM)",
+    "case_status": "Closed",
+    "closure_reason": "Resolved",
+    "closure_comments": null,
+    "close_date": "2026-07-02 09:09:26+00",
+    "target_close_date": "2026-07-03 08:38:30.433745+00",
+    "on_time": "ONTIME",
+    "report_source": "BOS311",
+    "full_address": "2-8 Saint Lukes Rd, Boston, MA 02134",
+    "street_number": "8",
+    "street_name": "Saint Lukes Rd",
+    "zip_code": "02134",
+    "neighborhood": "Allston",
+    "public_works_district": "4",
+    "city_council_district": "9",
+    "fire_district": "11",
+    "police_district": "D14",
+    "ward": "21",
+    "precinct": "03",
+    "submitted_photo": null,
+    "closed_photo": null,
+    "longitude": "-71.1267416",
+    "latitude": "42.3518549"
+   },
+   {
+    "_id": 3,
+    "case_id": "BCS-00256693",
+    "open_date": "2026-07-16 16:10:24.446642+00",
+    "case_topic": "Litter & Debris",
+    "service_name": "Litter & Debris",
+    "assigned_department": "Public Works Department (PWD)",
+    "assigned_team": "PWD Highway (BEAM)",
+    "case_status": "Closed",
+    "closure_reason": "Resolved",
+    "closure_comments": null,
+    "close_date": "2026-07-17 08:06:36+00",
+    "target_close_date": "2026-07-17 16:10:24.446642+00",
+    "on_time": "ONTIME",
+    "report_source": "BOS311",
+    "full_address": "11-17 E Concord St, Boston, MA 02118",
+    "street_number": null,
+    "street_name": "E Concord St",
+    "zip_code": "02118",
+    "neighborhood": "South End",
+    "public_works_district": "1C",
+    "city_council_district": "3",
+    "fire_district": "4",
+    "police_district": "D4",
+    "ward": "08",
+    "precinct": "02",
+    "submitted_photo": null,
+    "closed_photo": null,
+    "longitude": "-71.07473228",
+    "latitude": "42.33768644"
+   }
+  ]
+ },
+ "sql_test": [
+  {
+   "latest": "2026-10-13T22:36:42.347000",
+   "n": 189709
+  }
+ ]
+}
