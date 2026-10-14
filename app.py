@@ -67,17 +67,17 @@ if q:
 left, right = st.columns(2)
 with left:
     st.subheader("Surges this week")
-    st.dataframe(pd.DataFrame(b.spikes), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(b.spikes), hide_index=True, width="stretch")
     st.subheader("Falling behind (opened in the last 60 days)")
-    st.dataframe(pd.DataFrame(b.overdue), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(b.overdue), hide_index=True, width="stretch")
 with right:
     st.subheader("Neighborhoods behind expected (30 days)")
-    st.dataframe(pd.DataFrame(b.behind), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(b.behind), hide_index=True, width="stretch")
     st.subheader("Repeat hotspots (30 days)")
     hs = pd.DataFrame(b.hotspots)
     if not hs.empty:
         st.map(hs, latitude="latitude", longitude="longitude", size="reports")
-    st.dataframe(hs, hide_index=True, use_container_width=True)
+    st.dataframe(hs, hide_index=True, width="stretch")
 
 if b.data_watch:
     st.warning("Some request types nearly vanished this week. Boston is moving case types to a new 311 "
