@@ -5,6 +5,7 @@ Tokens are shared by the Streamlit app (CSS injected) and the HTML brief.
 from __future__ import annotations
 
 import html
+import re
 
 NIGHT, SURFACE, LINE = "#0E1013", "#16191E", "#272B31"
 INK, MUTED = "#ECEEF1", "#8D949D"
@@ -85,6 +86,15 @@ h2, h3, [data-testid="stHeading"] h2, [data-testid="stHeading"] h3 {{letter-spac
 .pulse-section {{color: {MUTED}; margin: -6px 0 18px}}
 </style>
 """
+
+def _compact(css: str) -> str:
+    """Streamlit renders st.markdown as Markdown: a blank line ends the HTML block and the rest of the
+    stylesheet shows up as page text. Drop comments and blank lines so it stays one HTML block."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return "\n".join(line for line in css.splitlines() if line.strip())
+
+
+STREAMLIT_CSS = _compact(STREAMLIT_CSS)
 
 STREAMLIT_TOML = f"""[theme]
 base = "dark"
