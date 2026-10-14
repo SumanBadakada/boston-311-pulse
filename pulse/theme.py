@@ -1,4 +1,8 @@
-"""Visual identity: Boston at night. One warm streetlight glow on a dark city; everything else quiet.
+"""Visual identity: the City of Boston's civic design language, kept minimal.
+
+Palette and typefaces follow Boston.gov's published brand: Charles Blue, Optimistic Blue and
+Freedom Trail Red on Snow White; Montserrat for headings, Lora for reading text. No logo or seal is
+used and every page says the project is independent, so it can't be mistaken for an official City site.
 
 Tokens are shared by the Streamlit app (CSS injected) and the HTML brief.
 """
@@ -7,85 +11,95 @@ from __future__ import annotations
 import html
 import re
 
-NIGHT, SURFACE, LINE = "#0E1013", "#16191E", "#272B31"
-INK, MUTED = "#ECEEF1", "#8D949D"
-AMBER, HALO, GOOD = "#FFB547", "#BFD9FF", "#7FD9A8"
-FONT_URL = "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+CHARLES = "#091F2F"     # Charles Blue: headings, primary buttons, header bar
+OPTIMISTIC = "#288BE4"  # Optimistic Blue: links, focus, active tab
+RED = "#FB4D42"         # Freedom Trail Red: the one most important action, and overdue
+SNOW = "#FFFFFF"        # Snow White: page
+MIST = "#F3F5F7"        # quiet panels
+RULE = "#D8DDE3"        # hairlines
+INK, MUTED = "#091F2F", "#58616B"
+# Kept for code that refers to the earlier names
+NIGHT, SURFACE, LINE, AMBER, HALO, GOOD = SNOW, MIST, RULE, RED, OPTIMISTIC, "#2E7D4F"
 
-GLOW_CSS = f"""
-.pulse-hero{{position:relative;text-align:center;padding:72px 16px 40px;overflow:hidden;isolation:isolate}}
-.pulse-hero .light{{position:absolute;left:50%;top:58px;width:120px;height:120px;transform:translateX(-50%);
-  border-radius:50%;z-index:-1;
-  background:radial-gradient(circle,#fffaf0 0%,#ffd48a 18%,rgba(255,181,71,.55) 34%,rgba(255,181,71,.12) 56%,rgba(255,181,71,0) 72%)}}
-.pulse-hero .cone{{position:absolute;left:50%;top:110px;width:760px;height:560px;transform:translateX(-50%);z-index:-2;
-  clip-path:polygon(46% 0,54% 0,100% 100%,0 100%);
-  background:linear-gradient(180deg,rgba(255,196,110,.20) 0%,rgba(255,181,71,.07) 34%,rgba(255,181,71,0) 62%);filter:blur(18px)}}
-.pulse-hero .halo{{position:absolute;left:50%;top:-140px;width:900px;height:620px;transform:translateX(-50%);z-index:-2;
-  background:radial-gradient(ellipse at center,rgba(191,217,255,.10) 0%,rgba(191,217,255,.04) 38%,rgba(14,16,19,0) 68%)}}
-.pulse-hero .ring{{position:absolute;left:50%;top:118px;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;
-  border:1px solid rgba(255,181,71,.55);z-index:-1;animation:ping 4.5s cubic-bezier(.2,.6,.3,1) infinite}}
-@keyframes ping{{0%{{transform:scale(.6);opacity:.9}}100%{{transform:scale(4.2);opacity:0}}}}
-@media (prefers-reduced-motion:reduce){{.pulse-hero .ring{{animation:none;opacity:0}}}}
-.pulse-pill{{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid {LINE};border-radius:999px;
-  background:rgba(22,25,30,.75);color:{MUTED};font-size:13px;font-weight:500;margin-top:118px}}
-.pulse-pill i{{width:7px;height:7px;border-radius:50%;background:{AMBER};box-shadow:0 0 10px {AMBER};display:inline-block}}
-.pulse-hero h1{{font-family:Manrope,sans-serif;font-weight:800;letter-spacing:-.035em;line-height:1.02;
-  font-size:clamp(36px,6.4vw,68px);color:{INK};margin:18px auto 14px;max-width:30ch;text-wrap:balance}}
-.pulse-hero p.sub{{color:{MUTED};font-size:clamp(15px,1.6vw,18px);max-width:52ch;margin:0 auto;line-height:1.55;text-wrap:pretty}}
-.pulse-stats{{display:flex;justify-content:center;flex-wrap:wrap;gap:12px 40px;margin-top:30px;color:{MUTED};font-size:14px}}
-.pulse-stats b{{display:block;color:{INK};font-size:22px;font-weight:700;letter-spacing:-.02em}}
+FONT_URL = ("https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400"
+            "&family=Montserrat:wght@500;600;700;800&display=swap")
+HEAD = "Montserrat, 'Helvetica Neue', Arial, sans-serif"
+BODY = "Lora, Georgia, 'Times New Roman', serif"
+
+BASE_CSS = f"""
+.civic-bar{{background:{CHARLES};color:#fff;display:flex;justify-content:space-between;align-items:center;
+  gap:16px;flex-wrap:wrap;padding:12px 24px;font-family:{HEAD};font-size:13px}}
+.civic-bar b{{font-weight:800;font-size:16px;letter-spacing:.01em}}
+.civic-bar span{{opacity:.8}}
+.civic-hero{{max-width:1080px;margin:0 auto;padding:56px 24px 36px;border-bottom:1px solid {RULE}}}
+.civic-hero .rule{{width:56px;height:4px;background:{RED};margin-bottom:22px}}
+.civic-hero h1{{font-family:{HEAD};font-weight:800;color:{CHARLES};letter-spacing:-.015em;line-height:1.08;
+  font-size:clamp(32px,5vw,54px);margin:0 0 16px;max-width:26ch;text-wrap:balance}}
+.civic-hero p.sub{{font-family:{BODY};color:{MUTED};font-size:clamp(17px,1.7vw,20px);line-height:1.6;
+  max-width:58ch;margin:0;text-wrap:pretty}}
+.civic-hero .note{{font-family:{HEAD};font-size:13px;color:{MUTED};margin:22px 0 0}}
+.civic-hero .note i{{display:inline-block;width:8px;height:8px;border-radius:50%;background:{OPTIMISTIC};margin-right:8px}}
+.civic-stats{{display:flex;flex-wrap:wrap;margin-top:34px;border-top:1px solid {RULE}}}
+.civic-stats div{{flex:1 1 180px;padding:18px 24px 4px 0;font-family:{BODY};color:{MUTED};font-size:15px}}
+.civic-stats div+div{{border-left:1px solid {RULE};padding-left:24px}}
+.civic-stats b{{display:block;font-family:{HEAD};color:{CHARLES};font-size:30px;font-weight:700;
+  letter-spacing:-.01em;line-height:1.2}}
+@media (max-width:640px){{.civic-stats div+div{{border-left:0;padding-left:0}}}}
 """
 
 
 def hero(title: str, sub: str, pill: str, stats: list[tuple[str, str]]) -> str:
     s = "".join(f"<div><b>{html.escape(v)}</b>{html.escape(k)}</div>" for k, v in stats)
-    return (f'<section class="pulse-hero"><div class="halo"></div><div class="cone"></div><div class="light"></div><div class="ring"></div>'
-            f'<span class="pulse-pill"><i></i>{html.escape(pill)}</span>'
-            f"<h1>{'<br>'.join(html.escape(t) for t in title.split(chr(10)))}</h1><p class=\"sub\">{html.escape(sub)}</p>"
-            f'<div class="pulse-stats">{s}</div></section>')
+    lines = "<br>".join(html.escape(t) for t in title.split("\n"))
+    return (f'<div class="civic-bar"><b>311 Pulse</b><span>Independent project using City of Boston open data. '
+            f'Not affiliated with the City.</span></div>'
+            f'<section class="civic-hero"><div class="rule"></div><h1>{lines}</h1>'
+            f'<p class="sub">{html.escape(sub)}</p><p class="note"><i></i>{html.escape(pill)}</p>'
+            + (f'<div class="civic-stats">{s}</div>' if stats else "") + "</section>")
 
 
 STREAMLIT_CSS = f"""
 <link rel="stylesheet" href="{FONT_URL}">
 <style>
-html, body, [class*="css"], .stApp, button, input, textarea, select {{font-family: Manrope, sans-serif !important}}
-.stApp {{background: {NIGHT}}}
-[data-testid="stHeader"] {{background: transparent}}
-[data-testid="stToolbar"], [data-testid="stDecoration"], footer {{visibility: hidden}}
-.block-container {{padding-top: 0 !important; max-width: 1180px}}
-{GLOW_CSS}
-h2, h3, [data-testid="stHeading"] h2, [data-testid="stHeading"] h3 {{letter-spacing: -.02em; font-weight: 700 !important}}
-/* tabs as a floating pill bar, like a site nav */
-[data-testid="stTabs"] [role="tablist"] {{gap: 4px; background: {SURFACE}; border: 1px solid {LINE};
-  border-radius: 999px; padding: 5px; width: fit-content; margin: 0 auto 28px}}
-[data-testid="stTabs"] [role="tab"] {{border-radius: 999px; padding: 8px 18px; height: auto; color: {MUTED}}}
-[data-testid="stTabs"] [role="tab"][aria-selected="true"] {{background: {INK}; color: {NIGHT}}}
-[data-testid="stTabs"] [role="tab"] p {{font-weight: 600}}
-[data-baseweb="tab-highlight"], [data-baseweb="tab-border"] {{display: none}}
-/* buttons */
+.stApp {{background:{SNOW}}}
+.stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp textarea, [data-testid="stMarkdownContainer"] {{font-family:{BODY}}}
+.stApp h1, .stApp h2, .stApp h3, .stApp h4, button, [data-testid="stMetricValue"], [data-testid="stMetricLabel"],
+[role="tab"] p, .stApp [data-testid="stExpander"] summary p, [data-baseweb="select"] {{font-family:{HEAD} !important}}
+[data-testid="stHeader"] {{background:transparent}}
+[data-testid="stToolbar"], [data-testid="stDecoration"], footer {{visibility:hidden}}
+.block-container {{padding-top:0 !important; max-width:1128px}}
+{BASE_CSS}
+.civic-bar {{margin:0 -24px}}
+.civic-hero {{padding-left:0; padding-right:0}}
+h2, h3 {{color:{CHARLES} !important; font-weight:700 !important; letter-spacing:-.01em}}
+[data-testid="stTabs"] [role="tablist"] {{gap:28px; border-bottom:1px solid {RULE}; margin:8px 0 26px}}
+[data-testid="stTabs"] [role="tab"] {{padding:14px 0; height:auto; color:{MUTED}; background:transparent}}
+[data-testid="stTabs"] [role="tab"] p {{font-weight:700; font-size:15px}}
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {{color:{CHARLES}}}
+[data-baseweb="tab-highlight"] {{background:{OPTIMISTIC} !important; height:3px !important}}
+[data-baseweb="tab-border"] {{display:none}}
 .stButton button, .stLinkButton a, .stDownloadButton button, [data-testid="stFormSubmitButton"] button {{
-  border-radius: 999px !important; border: 1px solid {LINE} !important; background: {SURFACE} !important;
-  color: {INK} !important; font-weight: 600 !important; padding: 8px 20px !important}}
+  border-radius:2px !important; border:2px solid {CHARLES} !important; background:{SNOW} !important;
+  color:{CHARLES} !important; font-weight:700 !important; padding:8px 20px !important; font-family:{HEAD} !important}}
 .stButton button:hover, .stLinkButton a:hover, .stDownloadButton button:hover,
-[data-testid="stFormSubmitButton"] button:hover {{border-color: {AMBER} !important; color: {AMBER} !important}}
+[data-testid="stFormSubmitButton"] button:hover {{background:{CHARLES} !important; color:#fff !important}}
 .stLinkButton a[kind="primary"], .stLinkButton a[data-testid="stBaseLinkButton-primary"] {{
-  background: {AMBER} !important; color: {NIGHT} !important; border-color: {AMBER} !important}}
-:focus-visible {{outline: 2px solid {AMBER} !important; outline-offset: 2px}}
-/* upload: the call to action */
-[data-testid="stFileUploaderDropzone"] {{background: radial-gradient(ellipse at top, rgba(255,181,71,.07), {SURFACE} 70%);
-  border: 1px dashed rgba(255,181,71,.45); border-radius: 22px; padding: 28px}}
-/* panels */
-[data-testid="stExpander"] details, [data-testid="stForm"] {{background: {SURFACE}; border: 1px solid {LINE}; border-radius: 18px}}
-[data-testid="stMetric"] {{background: {SURFACE}; border: 1px solid {LINE}; border-radius: 16px; padding: 14px 16px}}
-[data-testid="stMetricValue"] {{font-weight: 700; letter-spacing: -.02em}}
-[data-testid="stMetricLabel"] p {{color: {MUTED}}}
-[data-testid="stAlert"] {{border-radius: 16px}}
-[data-testid="stImage"] img {{border-radius: 18px}}
-[data-testid="stCode"] pre {{border-radius: 14px; border: 1px solid {LINE}}}
-[data-baseweb="input"], [data-baseweb="select"] > div, [data-baseweb="textarea"] {{border-radius: 12px !important}}
-.pulse-section {{color: {MUTED}; margin: -6px 0 18px}}
+  background:{RED} !important; border-color:{RED} !important; color:#fff !important}}
+:focus-visible {{outline:3px solid {OPTIMISTIC} !important; outline-offset:2px}}
+.stApp a {{color:{OPTIMISTIC}}}
+[data-testid="stFileUploaderDropzone"] {{background:{MIST}; border:2px dashed {CHARLES}40; border-radius:4px; padding:30px}}
+[data-testid="stExpander"] details, [data-testid="stForm"] {{background:{SNOW}; border:1px solid {RULE}; border-radius:4px}}
+[data-testid="stMetric"] {{border-left:3px solid {CHARLES}; padding:4px 0 4px 14px}}
+[data-testid="stMetricValue"] {{color:{CHARLES}; font-weight:700}}
+[data-testid="stMetricLabel"] p {{color:{MUTED}; font-family:{HEAD}}}
+[data-testid="stAlert"] {{border-radius:4px}}
+[data-testid="stImage"] img {{border-radius:4px}}
+[data-testid="stCode"] pre {{border-radius:4px; border:1px solid {RULE}; background:{MIST}}}
+[data-baseweb="input"], [data-baseweb="select"] > div, [data-baseweb="textarea"] {{border-radius:2px !important}}
+.civic-section {{color:{MUTED}; font-size:17px; margin:0 0 18px}}
 </style>
 """
+
 
 def _compact(css: str) -> str:
     """Streamlit renders st.markdown as Markdown: a blank line ends the HTML block and the rest of the
@@ -95,11 +109,12 @@ def _compact(css: str) -> str:
 
 
 STREAMLIT_CSS = _compact(STREAMLIT_CSS)
+GLOW_CSS = BASE_CSS  # name used by older callers
 
 STREAMLIT_TOML = f"""[theme]
-base = "dark"
-primaryColor = "{AMBER}"
-backgroundColor = "{NIGHT}"
-secondaryBackgroundColor = "{SURFACE}"
+base = "light"
+primaryColor = "{OPTIMISTIC}"
+backgroundColor = "{SNOW}"
+secondaryBackgroundColor = "{MIST}"
 textColor = "{INK}"
 """

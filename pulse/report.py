@@ -11,23 +11,23 @@ from .engine import Brief
 from . import theme
 
 CSS = f"""
-:root{{--ink:{theme.INK};--muted:{theme.MUTED};--line:{theme.LINE};--bg:{theme.NIGHT};--card:{theme.SURFACE};
-  --accent:{theme.AMBER};--warn:{theme.AMBER}}}
-*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 Manrope,-apple-system,Segoe UI,sans-serif}}
-{theme.GLOW_CSS}
-.pulse-hero{{padding-bottom:12px}}
-main{{max-width:900px;margin:0 auto;padding:0 16px 72px}}
-h2{{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:40px 0 12px}}
-.brief{{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px 26px;position:relative}}
-.brief::before{{content:"";position:absolute;inset:-1px;border-radius:22px;pointer-events:none;
-  background:radial-gradient(ellipse at top left,rgba(255,181,71,.10),transparent 55%)}}
-.brief ul{{margin:8px 0 0;padding-left:18px}}.brief li{{margin:6px 0}}.brief p{{margin:0}}
-.src{{color:var(--muted);font-size:12px;margin-top:12px}}
-table{{width:100%;border-collapse:collapse;font-size:14px}}th,td{{text-align:left;padding:10px 10px;border-bottom:1px solid var(--line)}}
-th{{color:var(--muted);font-weight:600}}td.n,th.n{{text-align:right;font-variant-numeric:tabular-nums}}
-.empty{{color:var(--muted)}}.warn{{color:var(--warn)}}svg text{{fill:var(--muted);font-size:11px}}
-.wrap{{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:4px 10px}}
-.sub{{color:var(--muted)}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:{theme.SNOW};color:{theme.INK};font:17px/1.65 {theme.BODY}}}
+{theme.BASE_CSS}
+main{{max-width:1080px;margin:0 auto;padding:8px 24px 80px}}
+h2{{font-family:{theme.HEAD};color:{theme.CHARLES};font-size:19px;font-weight:700;margin:44px 0 14px;
+  padding-bottom:10px;border-bottom:1px solid {theme.RULE}}}
+.brief{{background:{theme.MIST};border-left:4px solid {theme.CHARLES};padding:22px 28px;margin-top:36px}}
+.brief ul{{margin:10px 0 0;padding-left:20px}}.brief li{{margin:8px 0}}.brief p{{margin:0}}
+.brief strong{{font-family:{theme.HEAD};color:{theme.CHARLES}}}
+.src{{font-family:{theme.HEAD};color:{theme.MUTED};font-size:12px;margin-top:14px}}
+table{{width:100%;border-collapse:collapse;font-size:15px}}
+th,td{{text-align:left;padding:10px 10px;border-bottom:1px solid {theme.RULE}}}
+th{{font-family:{theme.HEAD};color:{theme.MUTED};font-weight:600;font-size:13px}}
+td.n,th.n{{text-align:right;font-variant-numeric:tabular-nums}}
+.empty{{color:{theme.MUTED}}}.warn{{color:{theme.RED}}}
+svg text{{fill:{theme.MUTED};font-size:11px;font-family:{theme.HEAD}}}
+.wrap{{overflow-x:auto}}.sub{{color:{theme.MUTED}}}
 """
 
 
@@ -77,7 +77,7 @@ def _volume_chart(df: pd.DataFrame, asof: pd.Timestamp, days: int = 56) -> str:
         bh = (h - 30) * v / s.max()
         cur = d > asof - pd.Timedelta(days=7)
         bars.append(f'<rect x="{pad + i * bw:.1f}" y="{h - 18 - bh:.1f}" width="{bw * 0.8:.1f}" height="{bh:.1f}" '
-                    f'fill="var(--{"accent" if cur else "line"})"><title>{d:%b %d}: {v:,}</title></rect>')
+                    f'fill="{theme.OPTIMISTIC if cur else "#C9D2DC"}"><title>{d:%b %d}: {v:,}</title></rect>')
     labels = "".join(f'<text x="{pad + i * bw:.1f}" y="{h - 4}">{d:%b %d}</text>'
                      for i, d in enumerate(s.index) if i % 14 == 0)
     return (f'<svg viewBox="0 0 {w} {h}" width="100%" role="img" aria-label="Daily 311 requests, last 8 weeks">'
@@ -113,7 +113,7 @@ def render(b: Brief, brief_md: str, source: str, df: pd.DataFrame) -> str:
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>311 Pulse {b.asof}</title>
 <link rel="stylesheet" href="{theme.FONT_URL}"><style>{CSS}</style></head><body>
-{theme.hero("311 Pulse: Boston", f"The week ending {b.asof} in Boston 311: {b.requests_this_window:,} requests against a typical {b.requests_weekly_baseline:,}. What surged, who is falling behind, and what keeps coming back.", "Refreshed every morning from City of Boston open data", [])}
+{theme.hero("Boston 311, this week", f"The week ending {pd.Timestamp(b.asof):%B %-d, %Y}: {b.requests_this_window:,} requests against a typical {b.requests_weekly_baseline:,}. What surged, which departments are falling behind, and what keeps coming back.", "Refreshed every morning from City of Boston open data", [])}
 <main>
 <div class="brief">{_md(brief_md)}<div class="src">Written by: {html.escape(source)}. Every figure is computed from the data; the AI only words it.</div></div>
 <h2>Daily requests, last {chart_days // 7} weeks (this week highlighted)</h2>{_volume_chart(df, asof, chart_days)}

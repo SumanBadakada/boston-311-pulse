@@ -16,7 +16,7 @@ from pulse.engine import DEPT_NAMES, build_brief, load
 from pulse.report import render
 from pulse.writer import answer_question, write_brief
 
-st.set_page_config(page_title="311 Pulse: Boston", page_icon="🏙️", layout="wide")
+st.set_page_config(page_title="311 Pulse: Boston", layout="wide")
 
 # Keys come from Streamlit secrets on Community Cloud (App settings -> Secrets), or the environment locally.
 for key in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY"):
@@ -58,9 +58,9 @@ else:
     past = open_cases.on_time_flag.eq(0)
 st.markdown(theme.hero(
     title="Spot a problem?\nSee if Boston already knows.",
-    sub="Snap a photo of a pothole, a dark streetlight or a dumped mattress. We check the City's open 311 cases "
-        "nearby, help you chase the stalled ones, and get new ones filed.",
-    pill=(f"Live City of Boston 311 data, through {data_end:%b %-d}" if LIVE.exists() else "Sample 311 data"),
+    sub="Add a photo of a pothole, a broken streetlight or dumped trash. We check the City's open 311 cases "
+        "nearby, help you follow up on stalled ones, and prepare new reports for filing.",
+    pill=(f"Live 311 data, updated daily, through {data_end:%B %-d, %Y}" if LIVE.exists() else "Sample 311 data"),
     stats=[("open cases tracked", f"{len(open_cases):,}"),
            ("past their target date", f"{past.mean():.0%}" if len(open_cases) else "n/a"),
            ("new requests last week", f"{(df.open_date > data_end - pd.Timedelta(days=7)).sum():,}")],
@@ -117,7 +117,7 @@ def show_case(c: dict, key: str):
 
 
 with tab_report:
-    st.markdown('<p class="pulse-section">Add a photo of a problem in a public space. '
+    st.markdown('<p class="civic-section">Add a photo of a problem in a public space. '
                 "Works best with the phone's location turned on.</p>", unsafe_allow_html=True)
 
     up = st.file_uploader("Photo", type=["jpg", "jpeg", "png", "webp"], label_visibility="collapsed")
@@ -149,7 +149,7 @@ with tab_report:
 
             if S.get("exif_loc"):
                 lat, lon = S.exif_loc
-                st.write(f"📍 Location from your photo: {lat:.5f}, {lon:.5f}")
+                st.write(f"Location from your photo: {lat:.5f}, {lon:.5f}")
                 S.loc = (lat, lon, None)
             else:
                 st.caption("Your photo has no location data (most browsers remove it). Tell us where it is:")
@@ -165,7 +165,7 @@ with tab_report:
         if S.get("loc"):
             lat, lon, matched = S.loc
             if matched:
-                st.caption(f"📍 {matched}")
+                st.caption(f"Location: {matched}")
             st.map(pd.DataFrame({"lat": [lat], "lon": [lon]}), zoom=16, height=220)
 
             radius = 400 if S.get("wide") else 150
@@ -199,7 +199,7 @@ with tab_report:
                     c = issues.case_details(row, TODAY)
                     with st.expander(f"{c['request_type']} · {c['address'] or c['neighborhood']} · "
                                      f"{c['distance_m']} m away · opened {c['opened']}"
-                                     + (" · ⚠️ overdue" if c["overdue"] else ""), expanded=(i == 0)):
+                                     + (" · past its target date" if c["overdue"] else ""), expanded=(i == 0)):
                         show_case(c, f"m{i}")
                 if not S.get("wide") and st.button("None of these is my issue"):
                     S.wide = True
@@ -227,7 +227,7 @@ with tab_report:
 # =====================================================================
 
 with tab_brief:
-    st.markdown('<p class="pulse-section">What changed in Boston 311 this week, for city managers.</p>',
+    st.markdown('<p class="civic-section">What changed in Boston 311 this week, for city managers.</p>',
                 unsafe_allow_html=True)
     hi = df.open_date.max().date()
     lo = df.open_date.min().date()
