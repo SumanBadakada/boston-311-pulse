@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from pulse import issues
+from pulse import issues, theme
 from pulse.engine import DEPT_NAMES, build_brief, load
 from pulse.report import render
 from pulse.writer import answer_question, write_brief
@@ -49,10 +49,23 @@ df = get_data(str(LIVE if LIVE.exists() else SAMPLE))
 data_end = df.open_date.max()
 TODAY = data_end + pd.Timedelta(days=1)  # data runs to yesterday; "today" for ages and targets
 
-st.title("311 Pulse: Boston")
-st.caption(f"Live City of Boston 311 data through {data_end:%b %d, %Y} · not an official City app"
-           if LIVE.exists() else "Sample data · not an official City app")
-tab_report, tab_brief = st.tabs(["📷 Report or check an issue", "📊 City brief"])
+st.markdown(theme.STREAMLIT_CSS, unsafe_allow_html=True)
+
+open_cases = df[df.case_status == "Open"]
+if "target_date" in df.columns:
+    past = open_cases.target_date.lt(TODAY) | (open_cases.target_date.isna() & open_cases.on_time_flag.eq(0))
+else:
+    past = open_cases.on_time_flag.eq(0)
+st.markdown(theme.hero(
+    title="Spot a problem?\nSee if Boston already knows.",
+    sub="Snap a photo of a pothole, a dark streetlight or a dumped mattress. We check the City's open 311 cases "
+        "nearby, help you chase the stalled ones, and get new ones filed.",
+    pill=(f"Live City of Boston 311 data, through {data_end:%b %-d}" if LIVE.exists() else "Sample 311 data"),
+    stats=[("open cases tracked", f"{len(open_cases):,}"),
+           ("past their target date", f"{past.mean():.0%}" if len(open_cases) else "n/a"),
+           ("new requests last week", f"{(df.open_date > data_end - pd.Timedelta(days=7)).sum():,}")],
+), unsafe_allow_html=True)
+tab_report, tab_brief = st.tabs(["Report or check an issue", "City brief"])
 
 
 # =====================================================================
@@ -104,9 +117,8 @@ def show_case(c: dict, key: str):
 
 
 with tab_report:
-    st.subheader("Is this already reported?")
-    st.write("Add a photo of a problem in a public space. We'll check the City's open cases nearby, "
-             "and help you follow up or file a new report.")
+    st.markdown('<p class="pulse-section">Add a photo of a problem in a public space. '
+                "Works best with the phone's location turned on.</p>", unsafe_allow_html=True)
 
     up = st.file_uploader("Photo", type=["jpg", "jpeg", "png", "webp"], label_visibility="collapsed")
     if up is not None:
@@ -215,6 +227,8 @@ with tab_report:
 # =====================================================================
 
 with tab_brief:
+    st.markdown('<p class="pulse-section">What changed in Boston 311 this week, for city managers.</p>',
+                unsafe_allow_html=True)
     hi = df.open_date.max().date()
     lo = df.open_date.min().date()
     if "system" in df.columns:  # live file: full data covers the last 42 days; older rows are only open cases

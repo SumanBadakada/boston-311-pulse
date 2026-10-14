@@ -8,17 +8,26 @@ import pandas as pd
 
 from .engine import Brief
 
-CSS = """
-:root{--ink:#1d2433;--muted:#5d6678;--line:#e3e6ec;--bg:#fff;--card:#f6f7f9;--accent:#1f5fbf;--warn:#b4441c}
-@media (prefers-color-scheme:dark){:root{--ink:#e8eaf0;--muted:#9aa3b5;--line:#2c3240;--bg:#13161d;--card:#1b1f28;--accent:#7aa7ff;--warn:#ff9a6b}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,Segoe UI,Roboto,sans-serif}
-main{max-width:860px;margin:0 auto;padding:28px 16px 60px}h1{font-size:24px;margin:0}h2{font-size:16px;margin:30px 0 8px}
-.sub{color:var(--muted);margin:4px 0 20px}.brief{background:var(--card);border-left:4px solid var(--accent);padding:14px 18px;border-radius:6px}
-.brief ul{margin:6px 0 0;padding-left:18px}.src{color:var(--muted);font-size:12px;margin-top:8px}
-table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
-th{color:var(--muted);font-weight:600}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-.empty{color:var(--muted)}.warn{color:var(--warn)}svg text{fill:var(--muted);font-size:11px}
-.wrap{overflow-x:auto}
+from . import theme
+
+CSS = f"""
+:root{{--ink:{theme.INK};--muted:{theme.MUTED};--line:{theme.LINE};--bg:{theme.NIGHT};--card:{theme.SURFACE};
+  --accent:{theme.AMBER};--warn:{theme.AMBER}}}
+*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 Manrope,-apple-system,Segoe UI,sans-serif}}
+{theme.GLOW_CSS}
+.pulse-hero{{padding-bottom:12px}}
+main{{max-width:900px;margin:0 auto;padding:0 16px 72px}}
+h2{{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:40px 0 12px}}
+.brief{{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px 26px;position:relative}}
+.brief::before{{content:"";position:absolute;inset:-1px;border-radius:22px;pointer-events:none;
+  background:radial-gradient(ellipse at top left,rgba(255,181,71,.10),transparent 55%)}}
+.brief ul{{margin:8px 0 0;padding-left:18px}}.brief li{{margin:6px 0}}.brief p{{margin:0}}
+.src{{color:var(--muted);font-size:12px;margin-top:12px}}
+table{{width:100%;border-collapse:collapse;font-size:14px}}th,td{{text-align:left;padding:10px 10px;border-bottom:1px solid var(--line)}}
+th{{color:var(--muted);font-weight:600}}td.n,th.n{{text-align:right;font-variant-numeric:tabular-nums}}
+.empty{{color:var(--muted)}}.warn{{color:var(--warn)}}svg text{{fill:var(--muted);font-size:11px}}
+.wrap{{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:4px 10px}}
+.sub{{color:var(--muted)}}
 """
 
 
@@ -77,6 +86,8 @@ def _volume_chart(df: pd.DataFrame, asof: pd.Timestamp, days: int = 56) -> str:
 
 def render(b: Brief, brief_md: str, source: str, df: pd.DataFrame) -> str:
     asof = pd.Timestamp(b.asof)
+    # live files hold complete data for ~6 weeks; older rows are only still-open cases, which would look like a lull
+    chart_days = 42 if "system" in df.columns else 56
     sections = [
         ("Surges this week", _table(b.spikes, [("neighborhood", "Neighborhood"), ("request_type", "Request type"),
                                                ("observed", "This week"), ("expected", "Normal"), ("ratio", "x normal")],
@@ -101,11 +112,11 @@ def render(b: Brief, brief_md: str, source: str, df: pd.DataFrame) -> str:
     body = "".join(f"<h2>{t}</h2>{c}" for t, c in sections)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>311 Pulse {b.asof}</title>
-<style>{CSS}</style></head><body><main>
-<h1>311 Pulse: Boston</h1>
-<p class="sub">Week ending {b.asof} · {b.requests_this_window:,} requests vs a typical {b.requests_weekly_baseline:,}</p>
+<link rel="stylesheet" href="{theme.FONT_URL}"><style>{CSS}</style></head><body>
+{theme.hero("311 Pulse: Boston", f"The week ending {b.asof} in Boston 311: {b.requests_this_window:,} requests against a typical {b.requests_weekly_baseline:,}. What surged, who is falling behind, and what keeps coming back.", "Refreshed every morning from City of Boston open data", [])}
+<main>
 <div class="brief">{_md(brief_md)}<div class="src">Written by: {html.escape(source)}. Every figure is computed from the data; the AI only words it.</div></div>
-<h2>Daily requests, last 8 weeks (this week highlighted)</h2>{_volume_chart(df, asof)}
+<h2>Daily requests, last {chart_days // 7} weeks (this week highlighted)</h2>{_volume_chart(df, asof, chart_days)}
 {body}
 <p class="sub" style="margin-top:30px">Data: City of Boston 311 service requests (Analyze Boston). Not an official City product.</p>
 </main></body></html>"""
