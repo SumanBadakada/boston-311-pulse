@@ -4,6 +4,8 @@
 
 **A daily-refreshed operations brief for Boston city managers, built from live 311 service requests.** It answers four questions every Monday: *what's surging, who's falling behind, which neighborhoods are being served worse than they should be, and which problems keep coming back.* An AI writes the summary; every number in it is computed from the data and checked before it's shown.
 
+**Today's brief: [sumanbadakada.github.io/boston-311-pulse](https://sumanbadakada.github.io/boston-311-pulse/)** · refreshed every morning from live city data
+
 ![311 Pulse brief for the week ending 2025-12-31](docs/brief.png)
 
 ## Why
