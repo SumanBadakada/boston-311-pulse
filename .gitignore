@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+brief.html
+.streamlit/secrets.toml
+.env
+data/*.csv
