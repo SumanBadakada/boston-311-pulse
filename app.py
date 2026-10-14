@@ -215,7 +215,10 @@ with tab_report:
 # =====================================================================
 
 with tab_brief:
-    lo, hi = df.open_date.min().date(), df.open_date.max().date()
+    hi = df.open_date.max().date()
+    lo = df.open_date.min().date()
+    if "system" in df.columns:  # live file: full data covers the last 42 days; older rows are only open cases
+        lo = max(lo, (pd.Timestamp(hi) - pd.Timedelta(days=41)).date())
     earliest = min(hi, (pd.Timestamp(lo) + pd.Timedelta(days=35)).date())  # needs a 4-week baseline
     asof = st.date_input("Week ending", value=hi, min_value=earliest, max_value=hi)
 
