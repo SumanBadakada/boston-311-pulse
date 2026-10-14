@@ -40,6 +40,10 @@ class LiveMappingTests(unittest.TestCase):
         self.assertAlmostEqual(r.resolution_hours, 0.8, places=1)
         self.assertEqual(r.request_type, "Litter & Debris")
 
+    def test_new_system_neighborhoods_fold_into_legacy_groups(self):
+        r = pd.DataFrame(SAMPLE["new_system"]["records"])[NEW_COLS].iloc[:1].assign(neighborhood="North End")
+        self.assertEqual(to_clean(r, "new").neighborhood.iat[0], "Downtown / Financial District")
+
     def test_department_codes(self):
         self.assertEqual(_dept_from_new("Boston Transportation Department (BTD)"), "BTDT")
         self.assertEqual(_dept_from_new("Some New Office"), "Some New Office")

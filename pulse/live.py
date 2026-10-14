@@ -37,6 +37,18 @@ NEW_COLS = ["case_id", "open_date", "close_date", "on_time", "case_status", "clo
 NEW_DEPT_CODES = {"PWD": "PWDx", "BTD": "BTDT", "ISD": "ISD", "PRD": "PARK", "PARKS": "PARK",
                   "BWSC": "BWSC", "PM": "PROP", "PROP": "PROP", "ACC": "ANML", "BPD": "BPD"}
 
+# The new system names finer-grained neighborhoods; fold them into the legacy groupings the
+# course analysis (and the legacy dataset) use, so one area isn't split across two names.
+NEW_NEIGHBORHOODS = {
+    "Allston": "Allston / Brighton", "Brighton": "Allston / Brighton",
+    "Fenway": "Fenway / Kenmore / Audubon Circle / Longwood", "Longwood": "Fenway / Kenmore / Audubon Circle / Longwood",
+    "Downtown": "Downtown / Financial District", "Chinatown": "Downtown / Financial District",
+    "Leather District": "Downtown / Financial District", "North End": "Downtown / Financial District",
+    "West End": "Downtown / Financial District", "Bay Village": "South End",
+    "South Boston": "South Boston / South Boston Waterfront",
+    "South Boston Waterfront": "South Boston / South Boston Waterfront", "Mattapan": "Greater Mattapan",
+}
+
 # Closures that end a case without fixing anything (duplicates, invalid, referred elsewhere).
 # Mirrors the course dataset's admin_close flag; those cases don't count as resolved.
 ADMIN_CLOSE = re.compile(r"duplicate|invalid|noted|no action|unable to|not (?:a )?city|referred|transfer"
@@ -89,6 +101,8 @@ def to_clean(raw: pd.DataFrame, system: str) -> pd.DataFrame:
     else:
         opened, closed = _local(raw.open_date, True), _local(raw.close_date, True)
         rtype, dept, source, cid = raw.service_name, raw.assigned_department.map(_dept_from_new), raw.report_source, raw.case_id
+    hood = raw.neighborhood.fillna("Unknown").astype(str).str.strip()
+    hood = hood.replace(NEW_NEIGHBORHOODS)  # legacy also uses "Allston", "Mattapan", "South Boston" at times
     status = raw.case_status.astype(str).str.strip().str.title()
     closed_ok = status.eq("Closed")
     admin = closed_ok & raw.closure_reason.fillna("").astype(str).str.contains(ADMIN_CLOSE)
@@ -100,7 +114,7 @@ def to_clean(raw: pd.DataFrame, system: str) -> pd.DataFrame:
         "request_type": rtype.astype(str).str.replace(r"\s+", " ", regex=True).str.strip(),
         "department": dept.astype(str),
         "source": source,
-        "neighborhood": raw.neighborhood.fillna("Unknown").astype(str).str.strip(),
+        "neighborhood": hood,
         "case_status": status.where(status.isin(["Open", "Closed"]), "Open"),
         "resolved": (closed_ok & ~admin).astype(int),
         "admin_close": admin.astype(int),

@@ -19,7 +19,7 @@ import pandas as pd
 DEPT_NAMES = {"PWDx": "Public Works", "BTDT": "Transportation", "ISD": "Inspectional Services",
               "PARK": "Parks & Recreation", "INFO": "311 / Information", "GEN": "General Services",
               "BWSC": "Water & Sewer Commission", "PROP": "Property Management", "ANML": "Animal Care & Control",
-              "BPD": "Police"}
+              "BPD": "Police", "BPHC": "Public Health Commission"}
 
 REQUIRED = ["open_date", "request_type", "department", "neighborhood", "case_status",
             "resolved", "on_time_flag", "resolution_hours", "expected_on_time", "latitude", "longitude"]
