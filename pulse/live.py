@@ -28,9 +28,11 @@ PAGE = 30000  # the city API caps rows per query; page beyond it
 TZ = "America/New_York"
 
 LEGACY_COLS = ["case_enquiry_id", "open_dt", "closed_dt", "on_time", "case_status", "closure_reason",
-               "type", "department", "neighborhood", "source", "latitude", "longitude"]
+               "type", "department", "neighborhood", "source", "latitude", "longitude",
+               "sla_target_dt", "location", "city_council_district"]
 NEW_COLS = ["case_id", "open_date", "close_date", "on_time", "case_status", "closure_reason",
-            "service_name", "assigned_department", "neighborhood", "report_source", "latitude", "longitude"]
+            "service_name", "assigned_department", "neighborhood", "report_source", "latitude", "longitude",
+            "target_close_date", "full_address", "city_council_district"]
 
 # New-system department names carry a code in brackets, e.g. "Public Works Department (PWD)".
 # Map those codes onto the legacy codes so one department isn't split in two.
@@ -69,11 +71,12 @@ def _sql(query: str, retries: int = 3) -> list[dict]:
     return []
 
 
-def _fetch(resource: str, cols: list[str], date_col: str, since: str) -> pd.DataFrame:
+def _fetch(resource: str, cols: list[str], date_col: str, since: str, where: str = "") -> pd.DataFrame:
     select = ", ".join(f'"{c}"' for c in cols)
+    extra = f" AND {where}" if where else ""
     rows, offset = [], 0
     while True:
-        batch = _sql(f'SELECT {select} FROM "{resource}" WHERE "{date_col}" >= \'{since}\' '
+        batch = _sql(f'SELECT {select} FROM "{resource}" WHERE "{date_col}" >= \'{since}\'{extra} '
                      f'ORDER BY "_id" LIMIT {PAGE} OFFSET {offset}')
         rows += batch
         if len(batch) < PAGE:
@@ -97,9 +100,11 @@ def to_clean(raw: pd.DataFrame, system: str) -> pd.DataFrame:
     """Map one raw dataset onto the cleaned schema used by the engine."""
     if system == "legacy":
         opened, closed = _local(raw.open_dt, False), _local(raw.closed_dt, False)
+        target, address = _local(raw.sla_target_dt, False), raw.location
         rtype, dept, source, cid = raw["type"], raw.department, raw.source, raw.case_enquiry_id.astype(str)
     else:
         opened, closed = _local(raw.open_date, True), _local(raw.close_date, True)
+        target, address = _local(raw.target_close_date, True), raw.full_address
         rtype, dept, source, cid = raw.service_name, raw.assigned_department.map(_dept_from_new), raw.report_source, raw.case_id
     hood = raw.neighborhood.fillna("Unknown").astype(str).str.strip()
     hood = hood.replace(NEW_NEIGHBORHOODS)  # legacy also uses "Allston", "Mattapan", "South Boston" at times
@@ -123,6 +128,9 @@ def to_clean(raw: pd.DataFrame, system: str) -> pd.DataFrame:
         "latitude": pd.to_numeric(raw.latitude, errors="coerce"),
         "longitude": pd.to_numeric(raw.longitude, errors="coerce"),
         "system": system,
+        "target_date": target,
+        "address": address.fillna("").astype(str).str.replace("&amp;", "&").str.replace(r"\s+", " ", regex=True).str.strip(),
+        "council_district": pd.to_numeric(raw.city_council_district, errors="coerce").astype("Int64"),
     })
     return out[out.open_date.notna()]
 
@@ -149,14 +157,20 @@ def expected_rates(since: str) -> pd.Series:
     return (g.on_time / g.n).round(4)
 
 
-def fetch_recent(days: int = 42, history_days: int = 365) -> pd.DataFrame:
-    """The last `days` of requests from both systems, with expected_on_time from the last year."""
+def fetch_recent(days: int = 42, history_days: int = 365, open_days: int = 180) -> pd.DataFrame:
+    """The last `days` of requests from both systems, plus every case still open from the last
+    `open_days` (so residents can find older unresolved cases), with expected_on_time from the last year."""
     now = pd.Timestamp.now(tz=TZ).tz_localize(None).normalize()
     start = now - pd.Timedelta(days=days)
     since = start.strftime("%Y-%m-%d")
     frames = [to_clean(_fetch(LEGACY[y], LEGACY_COLS, "open_dt", since), "legacy")
               for y in sorted({start.year, now.year}) if y in LEGACY]
     frames.append(to_clean(_fetch(NEW_SYSTEM, NEW_COLS, "open_date", since), "new"))
+    open_start = now - pd.Timedelta(days=open_days)
+    open_since, is_open = open_start.strftime("%Y-%m-%d"), "UPPER(\"case_status\") = 'OPEN'"
+    frames += [to_clean(_fetch(LEGACY[y], LEGACY_COLS, "open_dt", open_since, is_open), "legacy")
+               for y in sorted({open_start.year, now.year}) if y in LEGACY]
+    frames.append(to_clean(_fetch(NEW_SYSTEM, NEW_COLS, "open_date", open_since, is_open), "new"))
     df = pd.concat(frames, ignore_index=True).drop_duplicates("case_id")
     df = df[df.open_date < now]  # drop today: a partial day would look like a slump
     rates = expected_rates((now - pd.Timedelta(days=history_days)).strftime("%Y-%m-%d"))

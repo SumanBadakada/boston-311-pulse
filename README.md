@@ -13,7 +13,20 @@
 
 Boston logs hundreds of thousands of 311 requests a year. Dashboards show what happened; a manager starting the week needs to know what to act on. This started as a team Tableau analysis for *Analytics for Managers* at BU Questrom, comparing each neighborhood's on-time rate with what its request mix predicts. 311 Pulse turns that one-off analysis into a tool that runs on any week and says what changed.
 
-## What it finds
+## For residents: is this already reported?
+
+Upload a photo of a problem in a public space:
+
+1. **Gemini reads the photo** and names the issue (pothole, streetlight, graffiti, dumping...), with a one-line description a crew could act on. The resident can always correct it.
+2. **Location** comes from the photo's GPS; if the browser stripped it, the resident types an address (geocoded with OpenStreetMap, limited to Boston).
+3. **Matching** searches open cases, and cases closed in the last week, of the same kind within 150 m, across both of the City's 311 systems. Request types are grouped in plain language so the legacy "Request for Pothole Repair" and the new system's "Pothole" count as the same thing.
+4. **Already reported?** The resident sees the case: when it was opened, its target date, the department, and the case page.
+5. **Stalled?** If it's past its target date, the app drafts a follow-up email to 311 (311@boston.gov), copying the City Council for the district's councilor. The resident reviews it and sends it from their own email.
+6. **Not found?** A couple of verifying questions and a 400 m search, then a ready-to-paste report and a link to file it on the City's official BOS:311 site.
+
+The app never files a case or sends an email on anyone's behalf, and photos aren't stored.
+
+## What the city brief finds
 
 | Check | How | Example (week ending Dec 31 2025) |
 | --- | --- | --- |
@@ -59,7 +72,8 @@ pulse/live.py     pulls both live Boston 311 datasets into one schema
 pulse/engine.py   surges, overdue, behind-expected, hotspots, data check (pure pandas)
 pulse/writer.py   template brief, Claude brief + number check, follow-up Q&A
 pulse/report.py   self-contained HTML brief (inline SVG chart, light/dark)
-app.py            Streamlit UI
+pulse/issues.py   photo reading, GPS, geocoding, case matching, escalation email, report prep
+app.py            Streamlit UI: resident tab and city brief tab
 tests/            offline tests on synthetic data with known answers
 ```
 
