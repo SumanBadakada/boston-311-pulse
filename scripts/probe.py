@@ -9,6 +9,8 @@ def get(action, **params):
     req = urllib.request.Request(url, headers={"User-Agent": "boston-311-pulse/0.1"})
     with urllib.request.urlopen(req, timeout=60) as r:
         return json.load(r)
+import os
+os.makedirs("probe", exist_ok=True)
 out = {}
 for name, rid in RES.items():
     try:

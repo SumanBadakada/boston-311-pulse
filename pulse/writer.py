@@ -2,8 +2,8 @@
 
 Two writers share one contract: input is the Brief's facts, output is markdown.
 - `template_brief` is deterministic and needs no API key.
-- `claude_brief` asks Claude to write it, then checks that every number in the
-  text appears in the facts. If any number can't be traced, the AI draft is
+- `ai_brief` asks an LLM (Gemini's free tier, or Claude) to write it, then checks
+  that every number in the text appears in the facts. If any number can't be traced, the AI draft is
   discarded and the template brief is used instead. The model can reword and
   prioritise, but it cannot introduce a figure.
 """
@@ -93,7 +93,7 @@ def ungrounded_numbers(text: str, b: Brief) -> list[float]:
     return sorted(x for x in _numbers_in(text) if x not in allowed)
 
 
-# ---------- Claude writer ----------
+# ---------- AI writers ----------
 
 SYSTEM = """You write a weekly operations brief for Boston city managers from 311 service request data.
 Use ONLY the facts in the JSON you are given. Never compute new numbers (no sums, differences or
@@ -104,47 +104,73 @@ If data_watch is non-empty, add a final bullet warning that those request types 
 Boston's new 311 system, so the drop is likely a data change. Plain language, no jargon, under 170 words.
 Markdown only."""
 
-
-def claude_brief(b: Brief, model: str | None = None) -> tuple[str, str]:
-    """Returns (markdown, source) where source is 'claude' or 'template (reason)'."""
-    try:
-        import anthropic
-    except ImportError:
-        return template_brief(b), "template (anthropic package not installed)"
-    client = anthropic.Anthropic()
-    msg = client.messages.create(
-        model=model or os.environ.get("PULSE_MODEL", "claude-sonnet-5-5"), max_tokens=700, system=SYSTEM,
-        messages=[{"role": "user", "content": json.dumps(b.to_dict(), indent=1)}])
-    text = "".join(c.text for c in msg.content if getattr(c, "type", "") == "text").strip()
-    bad = ungrounded_numbers(text, b)
-    if bad:
-        return template_brief(b), f"template (AI draft rejected: untraceable numbers {bad[:5]})"
-    return text, "claude"
-
-
-def write_brief(b: Brief) -> tuple[str, str]:
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        try:
-            return claude_brief(b)
-        except Exception as e:  # network, quota, bad key: never leave the manager without a brief
-            return template_brief(b), f"template (AI unavailable: {type(e).__name__})"
-    return template_brief(b), "template (no API key)"
-
-
 QA_SYSTEM = """You answer a city manager's question about this week's Boston 311 brief.
 Use ONLY the JSON facts given. If the facts don't contain the answer, say so plainly and suggest
 what data would answer it. Never compute or estimate new numbers. Two to four sentences."""
 
+GEMINI_MODEL = "gemini-3.1-flash-lite"   # free tier, same model as the Boston Lease Checker
+CLAUDE_MODEL = "claude-sonnet-5-5"
 
-def answer_question(question: str, b: Brief, model: str | None = None) -> str:
+
+def provider() -> str | None:
+    """Gemini first (free tier), then Claude, else no AI. PULSE_PROVIDER forces one."""
+    forced = os.environ.get("PULSE_PROVIDER", "").lower()
+    if forced in ("gemini", "claude", "none"):
+        return None if forced == "none" else forced
+    if os.environ.get("GEMINI_API_KEY"):
+        return "gemini"
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "claude"
+    return None
+
+
+def _complete(system: str, user: str, max_tokens: int) -> tuple[str, str]:
+    """One model call. Returns (text, provider name)."""
+    which = provider()
+    if which == "gemini":
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        r = client.models.generate_content(
+            model=os.environ.get("PULSE_MODEL", GEMINI_MODEL), contents=user,
+            config=types.GenerateContentConfig(system_instruction=system, temperature=0.2,
+                                               max_output_tokens=max_tokens))
+        return (r.text or "").strip(), "gemini"
+    if which == "claude":
+        import anthropic
+        msg = anthropic.Anthropic().messages.create(
+            model=os.environ.get("PULSE_MODEL", CLAUDE_MODEL), max_tokens=max_tokens, system=system,
+            messages=[{"role": "user", "content": user}])
+        return "".join(c.text for c in msg.content if getattr(c, "type", "") == "text").strip(), "claude"
+    raise RuntimeError("no AI provider configured")
+
+
+def ai_brief(b: Brief) -> tuple[str, str]:
+    """AI-written brief, kept only if every number in it traces to the facts."""
+    text, who = _complete(SYSTEM, json.dumps(b.to_dict(), indent=1), 700)
+    bad = ungrounded_numbers(text, b)
+    if not text or bad:
+        return template_brief(b), f"template ({who} draft rejected: untraceable numbers {bad[:5]})"
+    return text, who
+
+
+def write_brief(b: Brief) -> tuple[str, str]:
+    if provider() is None:
+        return template_brief(b), "template (no AI key set)"
+    try:
+        return ai_brief(b)
+    except Exception as e:  # network, quota, bad key: never leave the manager without a brief
+        return template_brief(b), f"template (AI unavailable: {type(e).__name__})"
+
+
+def answer_question(question: str, b: Brief) -> str:
     """Follow-up Q&A over the computed facts, with the same number check as the brief."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return "Follow-up questions need an Anthropic API key (set ANTHROPIC_API_KEY)."
-    import anthropic
-    msg = anthropic.Anthropic().messages.create(
-        model=model or os.environ.get("PULSE_MODEL", "claude-sonnet-5-5"), max_tokens=400, system=QA_SYSTEM,
-        messages=[{"role": "user", "content": f"Facts:\n{json.dumps(b.to_dict())}\n\nQuestion: {question}"}])
-    text = "".join(c.text for c in msg.content if getattr(c, "type", "") == "text").strip()
+    if provider() is None:
+        return "Follow-up questions need an AI key (GEMINI_API_KEY is free)."
+    try:
+        text, _ = _complete(QA_SYSTEM, f"Facts:\n{json.dumps(b.to_dict())}\n\nQuestion: {question}", 400)
+    except Exception as e:
+        return f"The AI service is unavailable right now ({type(e).__name__}). Please try again shortly."
     bad = ungrounded_numbers(text, b)
     if bad:
         return f"I couldn't answer that reliably from this week's figures (the draft used numbers not in the data: {bad[:3]})."
