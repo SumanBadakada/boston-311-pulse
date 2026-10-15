@@ -197,6 +197,7 @@ def case_details(row: pd.Series, today: pd.Timestamp | None = None) -> dict:
         "request_type": row.request_type,
         "status": row.case_status,
         "opened": row.open_date.strftime("%b %d, %Y"),
+        "opened_ts": row.open_date,
         "days_open": days_open,
         "target": target.strftime("%b %d, %Y") if target is not None else None,
         "days_past_target": int((today - target).days) if (overdue and target is not None) else None,
@@ -229,6 +230,10 @@ def draft_escalation(c: dict, resident_note: str = "", name: str = "") -> dict:
         "",
         f"What I'm seeing: {resident_note.strip()}" if resident_note.strip() else None,
         "" if resident_note.strip() else None,
+        (f"For comparison, similar 311 cases are usually resolved within {c['fix']['range']} "
+         f"(8 in 10, based on {c['fix']['n']:,} past cases), and this one has been open {c['days_open']} days."
+         if c.get("fix") else None),
+        "" if c.get("fix") else None,
         "Could you share an update on when this will be addressed, or let me know if more information would help?",
         f"Case page: {c['link']}" if c.get("link") else None,
         "",

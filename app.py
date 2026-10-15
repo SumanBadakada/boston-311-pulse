@@ -11,8 +11,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from pulse import issues, theme
-from pulse.engine import DEPT_NAMES, build_brief, load
+from pulse import issues, predict, theme
+from pulse.engine import DEPT_NAMES, backlog, build_brief, load
 from pulse.report import render
 from pulse.writer import answer_question, write_brief
 
@@ -91,6 +91,11 @@ def show_case(c: dict, key: str):
              + (f" · Council District {c['council_district']} ({c['councilor']})" if c.get("councilor") else ""))
     if c.get("link"):
         st.markdown(f"[See this case on BOS:311]({c['link']})")
+    c["fix"] = predict.fix_time(c["request_type"], c["neighborhood"], c["opened_ts"])
+    if c["fix"]:
+        f = c["fix"]
+        st.caption(f"Similar cases are usually fixed in {f['typical']}, and 8 in 10 within {f['range']}. "
+                   f"{f['on_time']:.0%} close by their target date. Based on {f['n']:,} past cases: {f['basis']}.")
 
     if c["status"] != "Open":
         st.success("This was closed in the last week. If the problem is still there, file a new report "
@@ -188,6 +193,10 @@ with tab_report:
                     rep = issues.prepare_report(group, description, lat, lon, matched,
                                                 S.get("noticed", ""), S.get("extra", ""))
                     st.code(rep["text"], language=None)
+                    f = predict.fix_time(group, "", TODAY)
+                    if f:
+                        st.caption(f"Once filed, issues like this are usually fixed in {f['typical']}, and 8 in 10 "
+                                   f"within {f['range']} ({f['basis']}, {f['n']:,} past cases).")
                     c1, c2 = st.columns(2)
                     c1.link_button("File it on BOS:311", rep["file_at"], type="primary")
                     c2.link_button("Open the spot on a map", rep["map"])
@@ -238,44 +247,100 @@ with tab_brief:
 
     b = build_brief(df, pd.Timestamp(asof))
     text, source = write_brief(b)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Requests this week", f"{b.requests_this_window:,}",
-              f"{b.requests_this_window - b.requests_weekly_baseline:+,} vs typical", delta_color="off")
-    c2.metric("Surges flagged", len(b.spikes))
-    c3.metric("Late open cases", f"{b.overdue_total:,}")
-    c4.metric("Neighborhoods behind expected", len(b.behind))
+    week, back, ahead, times = st.tabs(["This week", "Backlog", "Outlook", "Fix times"])
 
-    st.info(text)
-    st.caption(f"Written by: {source}. Every figure is computed from the data; the AI only words it.")
+    with week:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Requests this week", f"{b.requests_this_window:,}",
+                  f"{b.requests_this_window - b.requests_weekly_baseline:+,} vs typical", delta_color="off")
+        c2.metric("Surges flagged", len(b.spikes))
+        c3.metric("Late open cases", f"{b.overdue_total:,}")
+        c4.metric("Neighborhoods behind expected", len(b.behind))
+        st.info(text)
+        st.caption(f"Written by: {source}. Every figure is computed from the data; the AI only words it.")
+        q = st.text_input("Ask a follow-up about this week")
+        if q:
+            asked = S.get("asked", 0)
+            if asked >= MAX_QUESTIONS:
+                st.write("You've reached the question limit for this session. Refresh the page to start again.")
+            else:
+                S["asked"] = asked + 1
+                st.write(answer_question(q, b))
+        left, right = st.columns(2)
+        with left:
+            st.subheader("Surges")
+            st.dataframe(pd.DataFrame(b.spikes), hide_index=True, width="stretch")
+            st.subheader("Neighborhoods behind expected")
+            st.dataframe(pd.DataFrame(b.behind), hide_index=True, width="stretch")
+        with right:
+            st.subheader("Repeat hotspots")
+            hs = pd.DataFrame(b.hotspots)
+            if not hs.empty:
+                st.map(hs, latitude="latitude", longitude="longitude", size="reports", height=260)
+            st.dataframe(hs, hide_index=True, width="stretch")
+        if b.data_watch:
+            st.warning("Some request types nearly vanished this week. Boston is moving case types to a new 311 "
+                       "system, so check the data before reading this as fewer problems.")
+            st.dataframe(pd.DataFrame(b.data_watch), hide_index=True)
+        st.download_button("Download this brief (HTML)", render(b, text, source, df),
+                           file_name=f"311-pulse-{b.asof}.html", mime="text/html")
 
-    q = st.text_input("Ask a follow-up about this week")
-    if q:
-        asked = S.get("asked", 0)
-        if asked >= MAX_QUESTIONS:
-            st.write("You've reached the question limit for this session. Refresh the page to start again.")
+    with back:
+        bl = pd.DataFrame(backlog(df, pd.Timestamp(asof)))
+        if bl.empty:
+            st.write("No open cases on this date.")
         else:
-            S["asked"] = asked + 1
-            st.write(answer_question(q, b))
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Open cases", f"{bl.open_cases.sum():,}")
+            c2.metric("Past their target date", f"{bl.past_target.sum():,}")
+            c3.metric("Share past target", f"{bl.past_target.sum() / bl.open_cases.sum():.0%}")
+            st.dataframe(bl.rename(columns={
+                "department": "Department", "open_cases": "Open", "past_target": "Past target",
+                "past_target_pct": "Past target (%)", "median_age_days": "Median age (days)",
+                "oldest_days": "Oldest (days)"}), hide_index=True, width="stretch")
+            st.caption("Every case open on the selected date, per department. Open cases are tracked back 180 days, "
+                       "so ages cap there.")
 
-    left, right = st.columns(2)
-    with left:
-        st.subheader("Surges this week")
-        st.dataframe(pd.DataFrame(b.spikes), hide_index=True, width="stretch")
-        st.subheader("Falling behind (opened in the last 60 days)")
-        st.dataframe(pd.DataFrame(b.overdue), hide_index=True, width="stretch")
-    with right:
-        st.subheader("Neighborhoods behind expected (30 days)")
-        st.dataframe(pd.DataFrame(b.behind), hide_index=True, width="stretch")
-        st.subheader("Repeat hotspots (30 days)")
-        hs = pd.DataFrame(b.hotspots)
-        if not hs.empty:
-            st.map(hs, latitude="latitude", longitude="longitude", size="reports")
-        st.dataframe(hs, hide_index=True, width="stretch")
+    with ahead:
+        rows = predict.outlook(pd.Timestamp(asof))
+        if not rows:
+            st.write("The outlook needs the model file (data/model.json).")
+        else:
+            st.write("What usually changes over the next four weeks, from the same weeks in 2024 and 2025.")
+            st.dataframe(pd.DataFrame(rows).rename(columns={
+                "issue": "Issue", "per_week_next": "Typical per week, next 4 weeks",
+                "per_week_recent": "Typical per week, last 4 weeks", "change_pct": "Change (%)"}),
+                hide_index=True, width="stretch")
+            st.caption("Seasonal averages from past years, so they show the usual pattern, not a forecast of "
+                       "this year's weather.")
 
-    if b.data_watch:
-        st.warning("Some request types nearly vanished this week. Boston is moving case types to a new 311 "
-                   "system, so check the data before reading this as fewer problems.")
-        st.dataframe(pd.DataFrame(b.data_watch), hide_index=True)
-
-    st.download_button("Download this brief (HTML)", render(b, text, source, df),
-                       file_name=f"311-pulse-{b.asof}.html", mime="text/html")
+    with times:
+        m = predict.model()
+        if not m:
+            st.write("Fix times need the model file (data/model.json).")
+        else:
+            c1, c2 = st.columns(2)
+            hood = c1.selectbox("Neighborhood", ["Citywide"] + sorted(
+                n for n in df.neighborhood.dropna().unique() if n not in ("Unknown", "Boston")))
+            season = c2.selectbox("Season", ["Winter", "Spring", "Summer", "Fall"],
+                                  index=["Winter", "Spring", "Summer", "Fall"].index(
+                                      predict.season_of(pd.Timestamp(asof).month)))
+            month = {"Winter": 1, "Spring": 4, "Summer": 7, "Fall": 10}[season]
+            out = []
+            for g in issues.ISSUE_GROUPS:
+                if g == "Something else":
+                    continue
+                f = predict.fix_time(g, "" if hood == "Citywide" else hood, pd.Timestamp(2026, month, 1))
+                out.append({"Issue": g, "Usually fixed in": f["typical"], "8 in 10 fixed within": f["range"],
+                            "Closed by target": f"{f['on_time']:.0%}", "Past cases": f["n"]})
+            st.dataframe(pd.DataFrame(out), hide_index=True, width="stretch")
+            ev = m["evaluation"]
+            with st.expander("How accurate are these predictions?"):
+                st.write(
+                    f"Built from 2024 alone and checked against {ev['test_cases']:,} real 2025 cases: the 80% range "
+                    f"held {ev['share_within_80pct_range']:.0%} of actual fix times, and the typical-time estimate was "
+                    f"off by {ev['median_abs_error_days']} days at the median, against {ev['baseline_median_abs_error_days']} "
+                    f"days for a one-number citywide guess. Slow cases (over 3 days) are harder: their range held "
+                    f"{ev['slow_cases_share_within_80pct_range']:.0%}. Predicted on-time rate "
+                    f"{ev['on_time_predicted']:.0%} against {ev['on_time_actual']:.0%} actual.")
+                st.caption(f"Trained on {m['cases']:,} resolved cases, {m['trained_on']}.")

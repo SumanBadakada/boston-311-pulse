@@ -26,6 +26,25 @@ Upload a photo of a problem in a public space:
 
 The app never files a case or sends an email on anyone's behalf, and photos aren't stored.
 
+## Predictions from two years of 311 history
+
+Built from the 2024–2025 dataset (283K resolved cases) and stored in `data/model.json` by `python -m pulse.predict <csv>`.
+
+- **How long a fix usually takes.** Every case card shows "similar cases are usually fixed in X days, and 8 in 10 within Y", plus how often they close by their target date. "Similar" starts narrow (same request type, neighborhood and season) and widens when there are fewer than 30 past cases, and the app says which comparison it used. The escalation email cites this, so a follow-up rests on evidence rather than frustration.
+- **Seasonal outlook.** For managers: which issues usually rise over the next four weeks (in late January, potholes typically jump about 65% as freeze-thaw sets in).
+- **Department backlog.** Every open case per department, how many are past target, and how old they are.
+
+**How accurate is it?** Built from 2024 alone and tested on 130,398 real 2025 cases:
+
+| Check | Result |
+| --- | --- |
+| Actual fix times inside the predicted 80% range | 79.8% (target 80%) |
+| Typical-time error, median | 0.24 days, vs 0.35 for a single citywide guess |
+| Predicted vs actual on-time rate | 85.9% vs 86.7% |
+| Slow cases (over 3 days): inside the 80% range | 66.3%, so long fixes are harder to predict |
+
+The method is deliberately simple: empirical quantiles of real past cases, no black box, so every prediction can be explained by the cases behind it.
+
 ## What the city brief finds
 
 | Check | How | Example (week ending Dec 31 2025) |
@@ -72,6 +91,7 @@ pulse/live.py     pulls both live Boston 311 datasets into one schema
 pulse/engine.py   surges, overdue, behind-expected, hotspots, data check (pure pandas)
 pulse/writer.py   template brief, Claude brief + number check, follow-up Q&A
 pulse/report.py   self-contained HTML brief (inline SVG chart, light/dark)
+pulse/predict.py  fix-time predictions, on-target rates, seasonal outlook (with holdout evaluation)
 pulse/issues.py   photo reading, GPS, geocoding, case matching, escalation email, report prep
 app.py            Streamlit UI: resident tab and city brief tab
 tests/            offline tests on synthetic data with known answers

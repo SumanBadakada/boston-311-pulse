@@ -136,6 +136,23 @@ def overdue(df: pd.DataFrame, asof: pd.Timestamp, recent_days: int = 60,
     return rows, int(len(o))
 
 
+def backlog(df: pd.DataFrame, asof: pd.Timestamp) -> list[dict]:
+    """Every case open on the as-of date, per department: how many, how many past target, how old."""
+    o = open_at(df, asof).assign(age_days=lambda x: (asof - x.open_date).dt.days)
+    if "target_date" in o.columns:
+        target = pd.to_datetime(o.target_date, errors="coerce")
+        late = target.lt(asof) | (target.isna() & o.on_time_flag.eq(0))
+    else:
+        late = o.on_time_flag.eq(0)
+    g = (o.assign(late=late.astype(int)).groupby("department")
+          .agg(open_cases=("late", "size"), past_target=("late", "sum"),
+               median_age_days=("age_days", "median"), oldest_days=("age_days", "max"))
+          .sort_values("open_cases", ascending=False))
+    return [{"department": DEPT_NAMES.get(d, d), "open_cases": int(x.open_cases), "past_target": int(x.past_target),
+             "past_target_pct": round(100 * x.past_target / x.open_cases), "median_age_days": int(x.median_age_days),
+             "oldest_days": int(x.oldest_days)} for d, x in g.iterrows()]
+
+
 def behind_expected(df: pd.DataFrame, asof: pd.Timestamp, days: int = 30,
                     min_cases: int = 100, top: int = 5) -> list[dict]:
     """Neighborhoods resolving cases on time less often than their request mix predicts.
