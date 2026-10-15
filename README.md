@@ -26,6 +26,17 @@ Upload a photo of a problem in a public space:
 
 The app never files a case or sends an email on anyone's behalf, and photos aren't stored.
 
+## For residents: track a case you already reported
+
+Enter a case number in the **Track my case** tab:
+
+- **A plain verdict.** On track, taking longer than usual, or slower than 8 in 10 similar cases, measured against the fix-time prediction below, with a progress bar from the day it was reported.
+- **Cases like mine.** Of similar issues reported within three days of yours, the share already fixed, citywide and in your neighborhood.
+- **You're not alone.** Other open reports of the same issue within 150 m, which also go into the follow-up email as evidence.
+- **The City's closing note.** If the case was closed, what the crew wrote, and a direct path to re-report it if the problem is still there.
+- **What to do next.** Wait, check back on a specific date, or follow up, with a calendar reminder (.ics) for the check-back date and the drafted email when a follow-up is warranted.
+- **A link that remembers.** The page URL carries the case number (`?case=...`), so a bookmark reopens it.
+
 ## Predictions from two years of 311 history
 
 Built from the 2024–2025 dataset (283K resolved cases) and stored in `data/model.json` by `python -m pulse.predict <csv>`.
@@ -93,7 +104,8 @@ pulse/writer.py   template brief, Claude brief + number check, follow-up Q&A
 pulse/report.py   self-contained HTML brief (inline SVG chart, light/dark)
 pulse/predict.py  fix-time predictions, on-target rates, seasonal outlook (with holdout evaluation)
 pulse/issues.py   photo reading, GPS, geocoding, case matching, escalation email, report prep
-app.py            Streamlit UI: resident tab and city brief tab
+pulse/tracker.py  case tracking: verdict, similar cases, nearby reports, next step, reminder
+app.py            Streamlit UI: report, track my case, and city brief tabs
 tests/            offline tests on synthetic data with known answers
 ```
 

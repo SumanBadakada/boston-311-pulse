@@ -234,6 +234,9 @@ def draft_escalation(c: dict, resident_note: str = "", name: str = "") -> dict:
          f"(8 in 10, based on {c['fix']['n']:,} past cases), and this one has been open {c['days_open']} days."
          if c.get("fix") else None),
         "" if c.get("fix") else None,
+        (f"There are also {c['nearby_reports']} other open reports of the same issue nearby, so it is affecting "
+         "more than one resident." if c.get("nearby_reports") else None),
+        "" if c.get("nearby_reports") else None,
         "Could you share an update on when this will be addressed, or let me know if more information would help?",
         f"Case page: {c['link']}" if c.get("link") else None,
         "",

@@ -32,7 +32,7 @@ LEGACY_COLS = ["case_enquiry_id", "open_dt", "closed_dt", "on_time", "case_statu
                "sla_target_dt", "location", "city_council_district"]
 NEW_COLS = ["case_id", "open_date", "close_date", "on_time", "case_status", "closure_reason",
             "service_name", "assigned_department", "neighborhood", "report_source", "latitude", "longitude",
-            "target_close_date", "full_address", "city_council_district"]
+            "target_close_date", "full_address", "city_council_district", "closure_comments"]
 
 # New-system department names carry a code in brackets, e.g. "Public Works Department (PWD)".
 # Map those codes onto the legacy codes so one department isn't split in two.
@@ -84,6 +84,21 @@ def _fetch(resource: str, cols: list[str], date_col: str, since: str, where: str
         offset += PAGE
 
 
+LEGACY_CLOSE_PREFIX = re.compile(
+    r"^\s*Case Closed\.?\s*(?:Closed date\s*:\s*(?:\w{3} \w{3} \d{1,2} [\d:]+ \w{3,4} \d{4}|\d{4}-\d{2}-\d{2}[ T][\d:.]+))?\s*",
+    re.I)
+
+
+def closure_note(reason, comments=None) -> str:
+    """The City's closing note in plain words: legacy notes lose their timestamp prefix,
+    new-system notes join the reason and any crew comment."""
+    r = LEGACY_CLOSE_PREFIX.sub("", str(reason or "")).strip()
+    c = str(comments or "").strip()
+    if c and c.lower() not in ("none", "nan") and c.lower() != r.lower():
+        r = f"{r}: {c}" if r else c
+    return "" if r.lower() in ("none", "nan") else r
+
+
 def _dept_from_new(name: str) -> str:
     m = re.search(r"\(([A-Za-z]+)\)\s*$", str(name or ""))
     if m:
@@ -106,6 +121,7 @@ def to_clean(raw: pd.DataFrame, system: str) -> pd.DataFrame:
         opened, closed = _local(raw.open_date, True), _local(raw.close_date, True)
         target, address = _local(raw.target_close_date, True), raw.full_address
         rtype, dept, source, cid = raw.service_name, raw.assigned_department.map(_dept_from_new), raw.report_source, raw.case_id
+    notes = raw.closure_comments if "closure_comments" in raw else [None] * len(raw)
     hood = raw.neighborhood.fillna("Unknown").astype(str).str.strip()
     hood = hood.replace(NEW_NEIGHBORHOODS)  # legacy also uses "Allston", "Mattapan", "South Boston" at times
     status = raw.case_status.astype(str).str.strip().str.title()
@@ -131,6 +147,7 @@ def to_clean(raw: pd.DataFrame, system: str) -> pd.DataFrame:
         "target_date": target,
         "address": address.fillna("").astype(str).str.replace("&amp;", "&").str.replace(r"\s+", " ", regex=True).str.strip(),
         "council_district": pd.to_numeric(raw.city_council_district, errors="coerce").astype("Int64"),
+        "closure_note": [closure_note(r, c) for r, c in zip(raw.closure_reason, notes)],
     })
     return out[out.open_date.notna()]
 

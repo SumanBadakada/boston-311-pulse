@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from pulse import issues, predict, theme
+from pulse import issues, predict, theme, tracker
 from pulse.engine import DEPT_NAMES, backlog, build_brief, load
 from pulse.report import render
 from pulse.writer import answer_question, write_brief
@@ -65,7 +65,7 @@ st.markdown(theme.hero(
            ("past their target date", f"{past.mean():.0%}" if len(open_cases) else "n/a"),
            ("new requests last week", f"{(df.open_date > data_end - pd.Timedelta(days=7)).sum():,}")],
 ), unsafe_allow_html=True)
-tab_report, tab_brief = st.tabs(["Report or check an issue", "City brief"])
+tab_report, tab_track, tab_brief = st.tabs(["Report an issue", "Track my case", "City brief"])
 
 
 # =====================================================================
@@ -77,6 +77,23 @@ def reset_flow():
     for k in list(S.keys()):
         if k in ("loc", "wide", "noticed", "extra", "exif_loc") or str(k).startswith("esc_draft_"):
             del S[k]
+
+
+def escalation_form(c: dict, key: str):
+    """Optional note and name, then a drafted email the resident sends from their own account."""
+    with st.form(f"esc_{key}"):
+        note = st.text_area("What you're seeing (optional, added to the email)",
+                            placeholder="e.g. The pothole has grown and cars swerve around it at night.")
+        name = st.text_input("Your name (optional)")
+        go = st.form_submit_button("Draft the email")
+    if go or S.get(f"esc_draft_{key}"):
+        d = issues.draft_escalation(c, note, name) if go else S[f"esc_draft_{key}"]
+        S[f"esc_draft_{key}"] = d
+        st.markdown(f"**To:** {d['to']}  \n**Cc:** {d['cc']}  \n**Subject:** {d['subject']}")
+        st.code(d["body"], language=None)
+        st.link_button("Open in my email app", d["mailto"])
+        st.caption("Nothing is sent until you press send in your own email. Individual councilor addresses "
+                   "aren't published, so the Council's shared inbox is copied with your councilor named.")
 
 
 def show_case(c: dict, key: str):
@@ -103,19 +120,7 @@ def show_case(c: dict, key: str):
     elif c["overdue"]:
         late = f"{c['days_past_target']} days past its target date" if c.get("days_past_target") else "past its target"
         st.error(f"This case is {late}. You can ask 311 and your city councilor for an update.")
-        with st.form(f"esc_{key}"):
-            note = st.text_area("What you're seeing (optional, added to the email)",
-                                placeholder="e.g. The pothole has grown and cars swerve around it at night.")
-            name = st.text_input("Your name (optional)")
-            go = st.form_submit_button("Draft the email")
-        if go or S.get(f"esc_draft_{key}"):
-            d = issues.draft_escalation(c, note, name) if go else S[f"esc_draft_{key}"]
-            S[f"esc_draft_{key}"] = d
-            st.markdown(f"**To:** {d['to']}  \n**Cc:** {d['cc']}  \n**Subject:** {d['subject']}")
-            st.code(d["body"], language=None)
-            st.link_button("Open in my email app", d["mailto"])
-            st.caption("Nothing is sent until you press send in your own email. Individual councilor addresses "
-                       "aren't published, so the Council's shared inbox is copied with your councilor named.")
+        escalation_form(c, key)
     else:
         due = f" It's due by {c['target']}." if c.get("target") else ""
         st.info(f"Already reported and still within its target time.{due} No need to file it again.")
@@ -217,18 +222,83 @@ with tab_report:
                     st.caption("Still not yours? It may be new: file it on BOS:311.")
                     st.link_button("File a new report on BOS:311", issues.REPORT_URL)
 
-    with st.expander("Already have a case number? Check it here"):
-        cid = st.text_input("Case number", placeholder="e.g. 101006726212 or BCS-00245057").strip()
-        if cid:
-            hit = df[df.case_id.astype(str).str.upper() == cid.upper()]
-            if hit.empty:
-                st.write("That case isn't in the last six weeks of data or the open cases we track. "
-                         f"Look it up on [BOS:311]({issues.TICKET_URL.format(cid)}) instead.")
-            else:
-                show_case(issues.case_details(hit.iloc[0], TODAY), "lookup")
-
+    st.caption("Already reported something? Use the Track my case tab.")
     st.caption("Photos are sent to Google Gemini to recognise the issue and are not stored by this app. "
                "This app never files or sends anything for you.")
+
+
+# =====================================================================
+# Residents: track a case they already reported
+# =====================================================================
+
+LEVEL_BOX = {"closed": st.success, "on_track": st.info, "long": st.warning, "slow": st.error}
+
+with tab_track:
+    st.markdown('<p class="civic-section">Enter your 311 case number to see where it stands, how it compares '
+                "with similar cases, and what to do next.</p>", unsafe_allow_html=True)
+    cid = st.text_input("Case number", value=st.query_params.get("case", ""),
+                        placeholder="e.g. 101006726212 or BCS-00245057").strip()
+    if cid:
+        st.query_params["case"] = cid  # the page URL now tracks this case: bookmark it to come back
+        hit = df[df.case_id.astype(str).str.upper() == cid.upper()]
+        if hit.empty:
+            st.write("That case isn't in the data we track (the last six weeks, plus cases still open from the last "
+                     f"six months). You can look it up on [BOS:311]({issues.TICKET_URL.format(cid)}).")
+        else:
+            row = hit.iloc[0]
+            t = tracker.track(df, row, TODAY)
+            c, fix = t["case"], t["fix"]
+            st.subheader(f"{c['request_type']} at {c['address'] or c['neighborhood']}")
+            st.caption(f"Case {c['case_id']}, {DEPT_NAMES.get(c['department'], c['department'])}, "
+                       f"reported {c['opened']}"
+                       + (f", Council District {c['council_district']} ({c['councilor']})" if c.get("councilor") else ""))
+            LEVEL_BOX[t["level"]](t["headline"] if t["level"] != "closed" else
+                                  f"Closed on {t['closed_on']}, {t['closed_after_days']} days after it was reported.")
+
+            if t["level"] != "closed" and fix:
+                p80_days = max(fix["p80"] / 24, 1)
+                st.progress(min(c["days_open"] / p80_days, 1.0),
+                            text=f"Day {c['days_open']}. Similar cases usually take {fix['typical']}; "
+                                 f"8 in 10 are fixed within {fix['range']}.")
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Days open" if t["level"] != "closed" else "Days to close",
+                      c["days_open"] if t["level"] != "closed" else t["closed_after_days"])
+            m2.metric("City target date", c["target"] or "None set")
+            m3.metric("Usually fixed in", fix["typical"] if fix else "n/a")
+            m4.metric("Closed by target, historically", f"{fix['on_time']:.0%}" if fix else "n/a")
+
+            st.markdown("#### What to do next")
+            st.write(t["next_step"])
+            if t["level"] == "closed":
+                if t["closure_note"]:
+                    st.write(f"The City's closing note: *{t['closure_note']}*")
+                st.link_button("Not fixed? File a new report on BOS:311", issues.REPORT_URL)
+            else:
+                if c["overdue"] or t["level"] == "slow":
+                    escalation_form(c, "track")
+                st.download_button(f"Add a reminder for {t['check_back']:%B %-d} to my calendar", t["calendar"],
+                                   file_name=f"311-case-{c['case_id']}.ics", mime="text/calendar")
+            if c.get("link"):
+                st.markdown(f"[See this case on BOS:311]({c['link']})")
+
+            st.markdown("#### How your case compares")
+            notes = []
+            if t["cohort"]:
+                k = t["cohort"]
+                line = (f"Of {k['n']:,} similar issues reported around the same time, {k['fixed_pct']}% are already fixed")
+                if k.get("local_n"):
+                    line += f" ({k['local_fixed_pct']}% of the {k['local_n']} in {c['neighborhood']})"
+                notes.append(line + ".")
+            if t["nearby_reports"]:
+                notes.append(f"{t['nearby_reports']} other open report{'s' if t['nearby_reports'] > 1 else ''} of the same "
+                             "issue nearby, so you're not the only one waiting." if t["level"] != "closed" else
+                             f"{t['nearby_reports']} open report{'s' if t['nearby_reports'] > 1 else ''} of the same issue "
+                             "nearby, which can mean the problem came back or wasn't fully fixed.")
+            if fix:
+                notes.append(f"Typical times are based on {fix['n']:,} past cases: {fix['basis']}.")
+            for n in notes:
+                st.write(n)
+            st.caption("Bookmark this page to check again later: the link keeps your case number.")
 
 
 # =====================================================================
