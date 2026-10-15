@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 
+import re
 import numpy as np
 import pandas as pd
 
@@ -212,3 +213,88 @@ def build_brief(df: pd.DataFrame, asof: str | pd.Timestamp | None = None,
         behind=behind_expected(df, asof),
         hotspots=hotspots(df, asof),
     )
+
+
+# ---------- facts for follow-up questions ----------
+
+_STOP = {"this", "that", "week", "weeks", "there", "were", "what", "which", "where", "when", "many", "much",
+         "have", "been", "with", "from", "about", "requests", "request", "requested", "reports", "reported",
+         "cases", "case", "boston", "city", "does", "show", "pickup", "pickups", "issues", "issue", "complaints",
+         "last", "most", "more", "than", "they", "them", "their", "should", "could", "would", "neighborhood"}
+_SYNONYMS = {"syringe": "needle", "syringes": "needle", "sharps": "needle", "rats": "rodent", "rat": "rodent",
+             "mice": "rodent", "streetlight": "street light", "streetlights": "street light",
+             "lights": "light", "potholes": "pothole", "trash": "trash", "garbage": "trash"}
+
+
+def _terms(question: str) -> list[str]:
+    words = re.findall(r"[a-z]+", question.lower())
+    out = []
+    for w in words:
+        if len(w) < 4 and w not in _SYNONYMS or w in _STOP:
+            continue
+        w = _SYNONYMS.get(w, w)
+        out.append(w[:-1] if w.endswith("s") and len(w) > 4 and w not in _SYNONYMS.values() else w)
+    return out
+
+
+def question_facts(df: pd.DataFrame, asof: pd.Timestamp, question: str, days: int = 7,
+                   baseline_weeks: int = 4, top_types: int = 8) -> dict:
+    """Counts the brief doesn't carry, for whatever the question names.
+
+    The brief only lists flagged items, so 'any needle pickups this week?' had nothing to go on.
+    This matches the question's words against request types, issue groups and neighborhoods and
+    returns this week's counts, the usual weekly count, how many are still open, and where.
+    """
+    from .issues import group_of  # local import: issues imports engine-free helpers only
+
+    asof = pd.Timestamp(asof)
+    start = asof - pd.Timedelta(days=days)
+    cur = _window(df, start, asof)
+    base = _window(df, start - pd.Timedelta(weeks=baseline_weeks), start)
+    still_open = set(open_at(df, asof).case_id.astype(str))
+    terms = _terms(question)
+
+    def has(text: str, t: str) -> bool:  # a word in text starts with the term ("rodent" in "Rodent Activity")
+        return re.search(r"\b" + re.escape(t), text.lower()) is not None
+
+    names = [str(h) for h in df.neighborhood.dropna().unique()]
+    q = question.lower()
+    hoods = [h for h in names if re.search(r"\b" + re.escape(h.lower()) + r"\b", q)]  # named in full wins
+    hoods = sorted(h for h in hoods if not any(h != o and h.lower() in o.lower() for o in hoods))  # West Roxbury, not Roxbury
+    if not hoods:
+        hoods = sorted(h for h in names if any(has(h, t) for t in terms))
+    hood_words = {w for h in hoods for w in re.findall(r"[a-z]+", h.lower())}
+    terms = [t for t in terms if t not in hood_words]
+    types = pd.Series(sorted(set(cur.request_type.dropna()) | set(base.request_type.dropna())))
+    groups = types.map(group_of)
+    direct = types[[any(has(a, t) for t in terms) for a in types]]  # "pothole" -> "Pothole" first
+    hit = direct if len(direct) else types[[g != "Something else" and any(has(g, t) for t in terms)
+                                            for g in groups]]
+
+    def summary(part_cur, part_base, label):
+        row = {"label": label, "this_week": int(len(part_cur)),
+               "usual_per_week": int(round(len(part_base) / baseline_weeks)),
+               "still_open_of_this_weeks": int(part_cur.case_id.astype(str).isin(still_open).sum())}
+        if len(part_cur) and part_cur.neighborhood.nunique() > 1:
+            row["by_neighborhood"] = {str(k): int(v) for k, v in part_cur.neighborhood.value_counts().head(5).items()}
+        if len(part_cur):
+            row["by_day"] = {d.strftime("%a %b %d"): int(v) for d, v in part_cur.open_date.value_counts().sort_index().items()}
+        return row
+
+    scope_cur = cur[cur.neighborhood.isin(hoods)] if hoods else cur
+    scope_base = base[base.neighborhood.isin(hoods)] if hoods else base
+    matched = []
+    for t in hit.head(top_types):
+        matched.append(summary(scope_cur[scope_cur.request_type == t], scope_base[scope_base.request_type == t],
+                               t + (f" in {', '.join(hoods)}" if hoods else "")))
+    facts = {"week": f"{start + pd.Timedelta(days=1):%b %d} to {asof:%b %d, %Y}",
+             "matched_request_types": matched}
+    if hoods and not matched:  # a place but no issue: what was reported there
+        facts["neighborhood_totals"] = [summary(cur[cur.neighborhood == h], base[base.neighborhood == h], h)
+                                        for h in hoods]
+        facts["top_request_types_there"] = {str(k): int(v) for k, v in
+                                            scope_cur.request_type.value_counts().head(8).items()}
+    if not matched and not hoods:  # nothing named: give the overall picture by issue group
+        g = cur.request_type.map(group_of).value_counts()
+        facts["requests_by_issue_group_this_week"] = {str(k): int(v) for k, v in g.items()}
+    return facts

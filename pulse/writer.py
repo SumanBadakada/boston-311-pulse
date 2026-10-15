@@ -65,7 +65,7 @@ def _numbers_in(text: str) -> set[float]:
     return out
 
 
-def _allowed_numbers(b: Brief) -> set[float]:
+def _allowed_numbers(b: Brief, extra: dict | None = None) -> set[float]:
     allowed: set[float] = set()
 
     def walk(v):
@@ -83,13 +83,14 @@ def _allowed_numbers(b: Brief) -> set[float]:
                 walk(x)
 
     walk(b.to_dict())
+    walk(extra or {})
     allowed.update({0, 1, 2, 3, 4, 5, 30, 311})  # list counts, "30 days", the service name
     return allowed
 
 
-def ungrounded_numbers(text: str, b: Brief) -> list[float]:
+def ungrounded_numbers(text: str, b: Brief, extra: dict | None = None) -> list[float]:
     """Numbers in the text that don't appear anywhere in the computed facts."""
-    allowed = _allowed_numbers(b)
+    allowed = _allowed_numbers(b, extra)
     return sorted(x for x in _numbers_in(text) if x not in allowed)
 
 
@@ -104,9 +105,12 @@ If data_watch is non-empty, add a final bullet warning that those request types 
 Boston's new 311 system, so the drop is likely a data change. Plain language, no jargon, under 170 words.
 Markdown only."""
 
-QA_SYSTEM = """You answer a city manager's question about this week's Boston 311 brief.
-Use ONLY the JSON facts given. If the facts don't contain the answer, say so plainly and suggest
-what data would answer it. Never compute or estimate new numbers. Two to four sentences."""
+QA_SYSTEM = """You answer a city manager's question about Boston 311 requests for the week in the facts.
+You get two JSON blocks: "brief" (items flagged this week) and "lookup" (counts for the request types and
+neighborhoods the question names: this_week, usual_per_week, still_open_of_this_weeks, by_neighborhood,
+by_day). Answer from the lookup first. If a matched type has this_week of 0, say none were reported.
+Use ONLY these facts and copy figures exactly; never compute or estimate new numbers. If neither block
+covers the question, say so plainly. Two to four sentences, plain language."""
 
 GEMINI_MODEL = "gemini-3.1-flash-lite"   # free tier, same model as the Boston Lease Checker
 CLAUDE_MODEL = "claude-sonnet-5-5"
@@ -163,15 +167,40 @@ def write_brief(b: Brief) -> tuple[str, str]:
         return template_brief(b), f"template (AI unavailable: {type(e).__name__})"
 
 
-def answer_question(question: str, b: Brief) -> str:
-    """Follow-up Q&A over the computed facts, with the same number check as the brief."""
+def template_answer(lookup: dict) -> str | None:
+    """A plain answer straight from the lookup, used without an AI key or when the AI's draft fails the check."""
+    rows = lookup.get("matched_request_types") or lookup.get("neighborhood_totals") or []
+    if not rows:
+        return None
+    out = []
+    for r in rows[:4]:
+        line = (f"{r['label']}: {r['this_week']:,} request{'s' if r['this_week'] != 1 else ''} in the week of "
+                f"{lookup['week']} (usually about {r['usual_per_week']:g} a week)")
+        if r["this_week"]:
+            line += f", {r["still_open_of_this_weeks"]:,} of them still open"
+            if r.get("by_neighborhood"):
+                line += ". Most in " + ", ".join(f"{k} ({v})" for k, v in list(r["by_neighborhood"].items())[:3])
+        out.append(line + ".")
+    return " ".join(out)
+
+
+def answer_question(question: str, b: Brief, lookup: dict | None = None) -> str:
+    """Follow-up Q&A over the computed facts, with the same number check as the brief.
+
+    `lookup` (engine.question_facts) carries counts for whatever the question names, so questions
+    about request types the brief didn't flag (needle pickups, graffiti...) still get real answers.
+    """
+    lookup = lookup or {}
+    plain = template_answer(lookup)
     if provider() is None:
-        return "Follow-up questions need an AI key (GEMINI_API_KEY is free)."
+        return plain or "Follow-up questions need an AI key (GEMINI_API_KEY is free)."
+    facts = json.dumps({"brief": b.to_dict(), "lookup": lookup})
     try:
-        text, _ = _complete(QA_SYSTEM, f"Facts:\n{json.dumps(b.to_dict())}\n\nQuestion: {question}", 400)
+        text, _ = _complete(QA_SYSTEM, f"Facts:\n{facts}\n\nQuestion: {question}", 400)
     except Exception as e:
-        return f"The AI service is unavailable right now ({type(e).__name__}). Please try again shortly."
-    bad = ungrounded_numbers(text, b)
+        return plain or f"The AI service is unavailable right now ({type(e).__name__}). Please try again shortly."
+    bad = ungrounded_numbers(text, b, lookup)
     if bad:
-        return f"I couldn't answer that reliably from this week's figures (the draft used numbers not in the data: {bad[:3]})."
+        return plain or ("I couldn't answer that reliably from this week's figures "
+                         f"(the draft used numbers not in the data: {bad[:3]}).")
     return text

@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from pulse import issues, predict, theme, tracker
-from pulse.engine import DEPT_NAMES, backlog, build_brief, load
+from pulse.engine import DEPT_NAMES, backlog, build_brief, load, question_facts
 from pulse.report import render
 from pulse.writer import answer_question, write_brief
 
@@ -328,14 +328,15 @@ with tab_brief:
         c4.metric("Neighborhoods behind expected", len(b.behind))
         st.info(text)
         st.caption(f"Written by: {source}. Every figure is computed from the data; the AI only words it.")
-        q = st.text_input("Ask a follow-up about this week")
+        q = st.text_input("Ask a follow-up about this week",
+                          placeholder="e.g. Any needle pickups in the South End? How many potholes in Dorchester?")
         if q:
             asked = S.get("asked", 0)
             if asked >= MAX_QUESTIONS:
                 st.write("You've reached the question limit for this session. Refresh the page to start again.")
             else:
                 S["asked"] = asked + 1
-                st.write(answer_question(q, b))
+                st.write(answer_question(q, b, question_facts(df, pd.Timestamp(asof), q)))
         left, right = st.columns(2)
         with left:
             st.subheader("Surges")
