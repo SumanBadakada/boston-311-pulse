@@ -106,7 +106,8 @@ def data_watch(df: pd.DataFrame, asof: pd.Timestamp, days: int = 7, baseline_wee
 
 def case_times(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     opened = df.open_date + pd.to_timedelta(df.get("hour", 0), unit="h")
-    closed = opened + pd.to_timedelta(df.resolution_hours, unit="h")
+    hours = df.resolution_hours.dropna()
+    closed = opened + pd.to_timedelta(hours, unit="h", errors="coerce").reindex(df.index)
     if "opened_at" in df:
         opened = pd.to_datetime(df.opened_at, errors="coerce", format="mixed").fillna(opened)
     if "closed_at" in df:

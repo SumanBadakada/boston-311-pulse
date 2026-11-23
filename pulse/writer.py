@@ -22,8 +22,8 @@ def _n(x: float) -> str:
 
 def template_brief(b: Brief) -> str:
     period = "day" if b.window_days == 1 else "week"
-    lines = [f"**311 Pulse, {period} ending {b.asof}.** {_n(b.requests_this_window)} requests in the last "
-             f"{b.window_days} days, against a typical {_n(b.requests_weekly_baseline)}."]
+    lines = [f"**311 Pulse, {period} ending {b.asof}.** {_n(b.requests_this_window)} requests that "
+             f"{period}, against a typical {_n(b.requests_weekly_baseline)}."]
     if b.spikes:
         s = b.spikes[0]
         lines.append(f"- **Surge:** {s['request_type']} in {s['neighborhood']}: {s['observed']} reports vs "
