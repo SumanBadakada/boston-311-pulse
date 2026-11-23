@@ -1,9 +1,10 @@
 """Regression checks for case filters and the evidence behind brief counts."""
+import tempfile
 import unittest
 
 import pandas as pd
 
-from pulse.engine import brief_evidence, build_brief
+from pulse.engine import brief_evidence, build_brief, load
 from pulse.explorer import nearby, search
 from tests.test_pulse import ASOF, baseline, rows
 
@@ -17,6 +18,17 @@ class ExplorerTests(unittest.TestCase):
         ).assign(case_id=["BCS-12", "101013", "101014"], address=["1 Main St", "2 Main St", "3 Main St"],
                  target_date=["2025-03-30", "2025-04-03", None])
         self.cutoff = ASOF + pd.Timedelta(days=1)
+
+    def test_missing_city_labels_remain_available_in_filters(self):
+        df = self.df.copy()
+        df.loc[1, ["request_type", "neighborhood", "department"]] = None
+        with tempfile.TemporaryFile(mode="w+") as snapshot:
+            df.to_csv(snapshot, index=False)
+            snapshot.seek(0)
+            loaded = load(snapshot)
+        self.assertEqual(loaded.loc[1, ["request_type", "neighborhood", "department"]].tolist(),
+                         ["Unknown", "Unknown", "Unknown"])
+        self.assertEqual(search(loaded, self.cutoff, types=["Unknown"]).case_id.tolist(), ["101013"])
 
     def test_filters_intersect_and_use_explicit_targets(self):
         found = search(self.df, self.cutoff, case="bcs", address="main st", types=["Pothole"],

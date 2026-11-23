@@ -32,7 +32,8 @@ def load(path: str) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Data is missing columns: {', '.join(missing)}")
     for col in ("request_type", "neighborhood", "department"):
-        df[col] = df[col].astype(str).str.replace(r"\s+", " ", regex=True).str.strip()
+        labels = df[col].astype("string").fillna("").str.replace(r"\s+", " ", regex=True).str.strip()
+        df[col] = labels.mask(labels.eq(""), "Unknown")
     return df
 
 

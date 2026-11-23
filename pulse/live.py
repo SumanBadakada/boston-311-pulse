@@ -168,6 +168,8 @@ def to_clean(raw: pd.DataFrame, system: str) -> pd.DataFrame:
         opened, closed = _local(raw.open_date, False), _local(raw.close_date, False)
         target, address = _local(raw.target_close_date, False), raw.full_address
         rtype, dept, source, cid = raw.service_name, raw.assigned_department.map(_dept_from_new), raw.report_source, raw.case_id
+    rtype = rtype.astype("string").fillna("Unknown")
+    dept = dept.astype("string").fillna("Unknown")
     notes = raw.closure_comments if "closure_comments" in raw else [None] * len(raw)
     hood = raw.neighborhood.fillna("Unknown").astype(str).str.strip()
     hood = hood.replace(NEW_NEIGHBORHOODS)  # legacy also uses "Allston", "Mattapan", "South Boston" at times
