@@ -21,7 +21,8 @@ def _n(x: float) -> str:
 
 
 def template_brief(b: Brief) -> str:
-    lines = [f"**311 Pulse, week ending {b.asof}.** {_n(b.requests_this_window)} requests in the last "
+    period = "day" if b.window_days == 1 else "week"
+    lines = [f"**311 Pulse, {period} ending {b.asof}.** {_n(b.requests_this_window)} requests in the last "
              f"{b.window_days} days, against a typical {_n(b.requests_weekly_baseline)}."]
     if b.spikes:
         s = b.spikes[0]
@@ -45,7 +46,7 @@ def template_brief(b: Brief) -> str:
                      f"{h['neighborhood']} in 30 days, {_n(h['still_open'])} still open.")
     if b.data_watch:
         names = ", ".join(d["request_type"] for d in b.data_watch[:3])
-        lines.append(f"- **Check the data first:** {names} nearly vanished this week. Boston is moving case types "
+        lines.append(f"- **Check the data first:** {names} dropped sharply in this period. Boston is moving case types "
                      "to a new 311 system, so this may be a data change rather than fewer problems.")
     return "\n".join(lines)
 

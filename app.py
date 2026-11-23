@@ -1,9 +1,4 @@
-"""311 Pulse: streamlit run app.py
-
-Tab 1 (residents): photo -> is it already reported? -> case details, an escalation email if it's
-stalled, or a ready-to-file report for Boston's official 311 site.
-Tab 2 (managers): the weekly operations brief.
-"""
+"""Boston 311 case explorer, resident reporting and city operations briefs."""
 import hashlib
 import os
 from pathlib import Path
@@ -12,9 +7,10 @@ import pandas as pd
 import streamlit as st
 
 from pulse import issues, predict, theme, tracker
-from pulse.engine import DEPT_NAMES, backlog, build_brief, load, question_facts
+from pulse.dashboard import show_evidence, show_explorer
+from pulse.engine import DEPT_NAMES, backlog, build_brief, load, overdue_mask, question_facts
 from pulse.report import render
-from pulse.writer import answer_question, write_brief
+from pulse.writer import answer_question, template_brief
 
 st.set_page_config(page_title="311 Pulse: Boston", layout="wide")
 
@@ -33,10 +29,10 @@ S = st.session_state
 
 
 @st.cache_data(show_spinner="Loading 311 data...")
-def get_data(src) -> pd.DataFrame:
+def get_data(src, snapshot_mtime) -> pd.DataFrame:
     df = load(src)
     if "target_date" in df.columns:
-        df["target_date"] = pd.to_datetime(df.target_date, errors="coerce")
+        df["target_date"] = pd.to_datetime(df.target_date, errors="coerce", format="mixed")
     return df
 
 
@@ -45,27 +41,27 @@ def cached_geocode(address: str):
     return issues.geocode(address)
 
 
-df = get_data(str(LIVE if LIVE.exists() else SAMPLE))
+snapshot = LIVE if LIVE.exists() else SAMPLE
+df = get_data(str(snapshot), snapshot.stat().st_mtime_ns)
 data_end = df.open_date.max()
-TODAY = data_end + pd.Timedelta(days=1)  # data runs to yesterday; "today" for ages and targets
+TODAY = data_end + pd.Timedelta(days=1)  # Use the snapshot cutoff for status and targets.
 
 st.markdown(theme.STREAMLIT_CSS, unsafe_allow_html=True)
 
 open_cases = df[df.case_status == "Open"]
-if "target_date" in df.columns:
-    past = open_cases.target_date.lt(TODAY) | (open_cases.target_date.isna() & open_cases.on_time_flag.eq(0))
-else:
-    past = open_cases.on_time_flag.eq(0)
+past = overdue_mask(open_cases, TODAY)
 st.markdown(theme.hero(
-    title="Spot a problem?\nSee if Boston already knows.",
-    sub="Add a photo of a pothole, a broken streetlight or dumped trash. We check the City's open 311 cases "
-        "nearby, help you follow up on stalled ones, and prepare new reports for filing.",
-    pill=(f"Live 311 data, updated daily, through {data_end:%B %-d, %Y}" if LIVE.exists() else "Sample 311 data"),
+    title="Boston 311 Pulse",
+    sub="Find service requests, report a neighborhood issue, and see how Boston is responding.",
+    pill=(f"City data through {data_end:%B %-d, %Y}" if LIVE.exists() else "Sample 311 data"),
     stats=[("open cases tracked", f"{len(open_cases):,}"),
-           ("past their target date", f"{past.mean():.0%}" if len(open_cases) else "n/a"),
+           ("past target", f"{past.sum():,}"),
            ("new requests last week", f"{(df.open_date > data_end - pd.Timedelta(days=7)).sum():,}")],
 ), unsafe_allow_html=True)
-tab_report, tab_track, tab_brief = st.tabs(["Report an issue", "Track my case", "City brief"])
+if LIVE.exists() and data_end < pd.Timestamp.now(tz="America/New_York").tz_localize(None).normalize() - pd.Timedelta(days=2):
+    st.warning(f"The last complete snapshot ends {data_end:%B %d, %Y}. Status and overdue figures use that snapshot.")
+tab_explore, tab_report, tab_track, tab_brief = st.tabs(
+    ["Explore requests", "Report an issue", "Track my case", "Daily and weekly briefs"])
 
 
 # =====================================================================
@@ -85,15 +81,19 @@ def escalation_form(c: dict, key: str):
         note = st.text_area("What you're seeing (optional, added to the email)",
                             placeholder="e.g. The pothole has grown and cars swerve around it at night.")
         name = st.text_input("Your name (optional)")
+        options = {"311 and district councilor": "both", "311": "311", "District councilor": "council"}
+        if not c.get("council_district"):
+            options = {"311": "311"}
+        recipient = options[st.selectbox("Send to", list(options))]
         go = st.form_submit_button("Draft the email")
     if go or S.get(f"esc_draft_{key}"):
-        d = issues.draft_escalation(c, note, name) if go else S[f"esc_draft_{key}"]
+        d = issues.draft_escalation(c, note, name, recipient) if go else S[f"esc_draft_{key}"]
         S[f"esc_draft_{key}"] = d
-        st.markdown(f"**To:** {d['to']}  \n**Cc:** {d['cc']}  \n**Subject:** {d['subject']}")
+        st.text(f"To: {d['to']}\n" + (f"Cc: {d['cc']}\n" if d["cc"] else "") + f"Subject: {d['subject']}")
         st.code(d["body"], language=None)
         st.link_button("Open in my email app", d["mailto"])
-        st.caption("Nothing is sent until you press send in your own email. Individual councilor addresses "
-                   "aren't published, so the Council's shared inbox is copied with your councilor named.")
+        st.caption("Review and send from your email app. Council drafts use the shared City Council inbox "
+                   "and name the district councilor when available.")
 
 
 def show_case(c: dict, key: str):
@@ -126,15 +126,24 @@ def show_case(c: dict, key: str):
         st.info(f"Already reported and still within its target time.{due} No need to file it again.")
 
 
+with tab_explore:
+    show_explorer(df, TODAY, escalation_form)
+
+
 with tab_report:
-    st.markdown('<p class="civic-section">Add a photo of a problem in a public space. '
+    st.markdown('<p class="civic-section">Describe a problem in a public space. '
                 "Works best with the phone's location turned on.</p>", unsafe_allow_html=True)
 
     up = st.file_uploader("Photo", type=["jpg", "jpeg", "png", "webp"], label_visibility="collapsed")
-    if up is not None:
-        img = up.getvalue()
-        h = hashlib.sha1(img).hexdigest()
-        if S.get("photo_hash") != h:  # a new photo restarts the flow
+    if up is None and S.get("photo_hash"):
+        reset_flow()
+        for key in ("photo_hash", "read"):
+            S.pop(key, None)
+    report_manually = st.checkbox("Continue without a photo", key="manual_report") if up is None else False
+    if up is not None or report_manually:
+        img = up.getvalue() if up is not None else None
+        h = hashlib.sha256(img).hexdigest() if img else None
+        if img and S.get("photo_hash") != h:  # a new photo restarts the flow
             reset_flow()
             S.photo_hash = h
             S.read = None
@@ -145,7 +154,8 @@ with tab_report:
             S.exif_loc = issues.photo_location(img)
 
         left, right = st.columns([1, 2])
-        left.image(img, width="stretch")
+        if img:
+            left.image(img, width="stretch")
         with right:
             read = S.get("read")
             groups = list(issues.ISSUE_GROUPS)
@@ -155,14 +165,17 @@ with tab_report:
                 if read.has_people_or_plates:
                     st.warning("Your photo shows people or licence plates. Crop them out before sharing it with the City.")
             group = st.selectbox("Issue type (change it if this isn't right)", groups, index=default)
-            description = read.description if read else ""
-
-            if S.get("exif_loc"):
-                lat, lon = S.exif_loc
+            description = st.text_area("What should the crew look for?", value=read.description if read else "",
+                                       key=f"report_description_{h}")
+            gps = S.get("exif_loc")
+            if gps:
+                lat, lon = gps
                 st.write(f"Location from your photo: {lat:.5f}, {lon:.5f}")
-                S.loc = (lat, lon, None)
-            else:
-                st.caption("Your photo has no location data (most browsers remove it). Tell us where it is:")
+                if st.button("Use photo location"):
+                    S.loc = (lat, lon, None)
+                    S.pop("wide", None)
+                if "loc" not in S:
+                    S.loc = (lat, lon, None)
             addr = st.text_input("Address or intersection", placeholder="e.g. 115 Jersey St, or Albion St & Clifton St")
             if addr and st.button("Find this location"):
                 g = cached_geocode(addr)
@@ -170,6 +183,8 @@ with tab_report:
                     S.loc = g
                     S.pop("wide", None)
                 else:
+                    S.pop("loc", None)
+                    S.pop("wide", None)
                     st.error("Couldn't find that address in Boston. Try adding a house number or a cross street.")
 
         if S.get("loc"):
@@ -178,6 +193,10 @@ with tab_report:
                 st.caption(f"Location: {matched}")
             st.map(pd.DataFrame({"lat": [lat], "lon": [lon]}), zoom=16, height=220)
 
+            match_context = (lat, lon, group)
+            if S.get("match_context") != match_context:
+                S.pop("wide", None)
+                S.match_context = match_context
             radius = 400 if S.get("wide") else 150
             matches = issues.find_matches(df, lat, lon, group, radius_m=radius, today=TODAY)
             if matches.empty:
@@ -219,8 +238,11 @@ with tab_report:
                     S.wide = True
                     st.rerun()
                 elif S.get("wide"):
-                    st.caption("Still not yours? It may be new: file it on BOS:311.")
-                    st.link_button("File a new report on BOS:311", issues.REPORT_URL)
+                    if st.checkbox("These cases describe a different problem"):
+                        rep = issues.prepare_report(group, description, lat, lon, matched,
+                                                    S.get("noticed", ""), S.get("extra", ""), checked_clear=False)
+                        st.code(rep["text"], language=None)
+                        st.link_button("File a new report on BOS:311", rep["file_at"])
 
     st.caption("Already reported something? Use the Track my case tab.")
     st.caption("Photos are sent to Google Gemini to recognise the issue and are not stored by this app. "
@@ -306,37 +328,43 @@ with tab_track:
 # =====================================================================
 
 with tab_brief:
-    st.markdown('<p class="civic-section">What changed in Boston 311 this week, for city managers.</p>',
+    st.markdown('<p class="civic-section">See what changed across Boston and check each finding against the underlying records.</p>',
                 unsafe_allow_html=True)
     hi = df.open_date.max().date()
     lo = df.open_date.min().date()
     if "system" in df.columns:  # live file: full data covers the last 42 days; older rows are only open cases
         lo = max(lo, (pd.Timestamp(hi) - pd.Timedelta(days=41)).date())
-    earliest = min(hi, (pd.Timestamp(lo) + pd.Timedelta(days=35)).date())  # needs a 4-week baseline
-    asof = st.date_input("Week ending", value=hi, min_value=earliest, max_value=hi)
+    frequency, date = st.columns(2)
+    period = frequency.radio("Brief period", ["Daily", "Weekly"], horizontal=True, index=1)
+    days = 1 if period == "Daily" else 7
+    earliest = min(hi, (pd.Timestamp(lo) + pd.Timedelta(days=27 + days)).date())
+    asof = date.date_input("Period ending", value=hi, min_value=earliest, max_value=hi)
 
-    b = build_brief(df, pd.Timestamp(asof))
-    text, source = write_brief(b)
-    week, back, ahead, times = st.tabs(["This week", "Backlog", "Outlook", "Fix times"])
+    b = build_brief(df, pd.Timestamp(asof), days=days)
+    text, source = template_brief(b), "Computed summary"
+    week, back, ahead, times = st.tabs(["Findings", "Backlog", "Outlook", "Fix times"])
 
     with week:
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Requests this week", f"{b.requests_this_window:,}",
+        c1.metric("Requests in period", f"{b.requests_this_window:,}",
                   f"{b.requests_this_window - b.requests_weekly_baseline:+,} vs typical", delta_color="off")
         c2.metric("Surges flagged", len(b.spikes))
         c3.metric("Late open cases", f"{b.overdue_total:,}")
         c4.metric("Neighborhoods behind expected", len(b.behind))
         st.info(text)
-        st.caption(f"Written by: {source}. Every figure is computed from the data; the AI only words it.")
-        q = st.text_input("Ask a follow-up about this week",
+        show_evidence(df, b)
+        q = st.text_input("Ask a follow-up about this period",
                           placeholder="e.g. Any needle pickups in the South End? How many potholes in Dorchester?")
-        if q:
+        if q and st.button("Answer from the records"):
             asked = S.get("asked", 0)
             if asked >= MAX_QUESTIONS:
-                st.write("You've reached the question limit for this session. Refresh the page to start again.")
+                st.write("You've reached the question limit for this session.")
             else:
                 S["asked"] = asked + 1
-                st.write(answer_question(q, b, question_facts(df, pd.Timestamp(asof), q)))
+                S.brief_answer = (q, asof, days, answer_question(
+                    q, b, question_facts(df, pd.Timestamp(asof), q, days=days)))
+        if S.get("brief_answer", ())[:3] == (q, asof, days):
+            st.write(S.brief_answer[3])
         left, right = st.columns(2)
         with left:
             st.subheader("Surges")
@@ -344,17 +372,20 @@ with tab_brief:
             st.subheader("Neighborhoods behind expected")
             st.dataframe(pd.DataFrame(b.behind), hide_index=True, width="stretch")
         with right:
+            st.subheader("Falling behind")
+            st.dataframe(pd.DataFrame(b.overdue).drop(columns=["department_code"], errors="ignore"),
+                         hide_index=True, width="stretch")
             st.subheader("Repeat hotspots")
             hs = pd.DataFrame(b.hotspots)
             if not hs.empty:
                 st.map(hs, latitude="latitude", longitude="longitude", size="reports", height=260)
             st.dataframe(hs, hide_index=True, width="stretch")
         if b.data_watch:
-            st.warning("Some request types nearly vanished this week. Boston is moving case types to a new 311 "
+            st.warning("Some request types dropped sharply in this period. Boston is moving case types to a new 311 "
                        "system, so check the data before reading this as fewer problems.")
             st.dataframe(pd.DataFrame(b.data_watch), hide_index=True)
         st.download_button("Download this brief (HTML)", render(b, text, source, df),
-                           file_name=f"311-pulse-{b.asof}.html", mime="text/html")
+                           file_name=f"311-pulse-{period.lower()}-{b.asof}.html", mime="text/html")
 
     with back:
         bl = pd.DataFrame(backlog(df, pd.Timestamp(asof)))

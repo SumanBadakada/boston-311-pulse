@@ -27,7 +27,7 @@ import pandas as pd
 # Plain-language issue groups, each matching request types from BOTH city systems
 # (legacy names like "Request for Pothole Repair", new names like "Pothole").
 ISSUE_GROUPS: dict[str, str] = {
-    "Illegal parking / blocked sidewalk": r"parking enforcement|blocked sidewalk|double park",
+    "Illegal parking / blocked sidewalk": r"parking enforcement|illegal parking|blocked sidewalk|double park",
     "Pothole or road damage": r"pothole|pavement|roadway repair|street repair|manhole|utility casting",
     "Broken sidewalk": r"sidewalk repair|broken sidewalk|\bcurb",
     "Unshoveled sidewalk / snow": r"unshoveled|\bsnow|\bice\b",
@@ -171,7 +171,8 @@ def find_matches(df: pd.DataFrame, lat: float, lon: float, group: str, radius_m:
     d = d[(d.latitude.between(lat - box, lat + box)) & (d.longitude.between(lon - box * 1.4, lon + box * 1.4))]
     if d.empty:
         return d.assign(distance_m=[], group=[])
-    closed_at = d.open_date + pd.to_timedelta(d.get("hour", 0), unit="h") + pd.to_timedelta(d.resolution_hours, unit="h")
+    from .engine import case_times
+    _, closed_at = case_times(d)
     keep = (d.case_status == "Open") | (closed_at >= today - pd.Timedelta(days=recent_closed_days))
     d = d[keep].assign(group=lambda x: x.request_type.map(group_of))
     if group != "Something else":
@@ -189,6 +190,7 @@ def case_details(row: pd.Series, today: pd.Timestamp | None = None) -> dict:
     is_open = row.case_status == "Open"
     days_open = int((today - row.open_date).days)
     overdue = bool(is_open and ((target is not None and target < today) or (target is None and row.on_time_flag == 0)))
+    address = row.get("address")
     district = row.get("council_district")
     district = int(district) if pd.notna(district) else None
     cid = str(row.case_id)
@@ -202,7 +204,7 @@ def case_details(row: pd.Series, today: pd.Timestamp | None = None) -> dict:
         "target": target.strftime("%b %d, %Y") if target is not None else None,
         "days_past_target": int((today - target).days) if (overdue and target is not None) else None,
         "overdue": overdue,
-        "address": str(row.get("address") or "").strip() or None,
+        "address": str(address).strip() or None if pd.notna(address) else None,
         "neighborhood": row.neighborhood,
         "department": row.department,
         "council_district": district,
@@ -212,7 +214,7 @@ def case_details(row: pd.Series, today: pd.Timestamp | None = None) -> dict:
     }
 
 
-def draft_escalation(c: dict, resident_note: str = "", name: str = "") -> dict:
+def draft_escalation(c: dict, resident_note: str = "", name: str = "", recipient: str = "both") -> dict:
     """Email to 311, copied to the City Council for the district councilor. The resident reviews and sends."""
     from .engine import DEPT_NAMES
     dept = DEPT_NAMES.get(c["department"], c["department"])
@@ -240,19 +242,24 @@ def draft_escalation(c: dict, resident_note: str = "", name: str = "") -> dict:
         "Could you share an update on when this will be addressed, or let me know if more information would help?",
         f"Case page: {c['link']}" if c.get("link") else None,
         "",
-        f"I'm copying the City Council for the attention of {attn}.",
+        f"For the attention of {attn}." if recipient == "council" else
+        f"I'm copying the City Council for the attention of {attn}." if recipient == "both" else None,
         "",
         "Thank you,",
         name.strip() or "[Your name]",
         "[Your phone or email, if you'd like a reply]",
     ]))
-    mailto = (f"mailto:{CITY_311_EMAIL}?" + urllib.parse.urlencode(
-        {"cc": CITY_COUNCIL_EMAIL, "subject": subject, "body": body}, quote_via=urllib.parse.quote))
-    return {"to": CITY_311_EMAIL, "cc": CITY_COUNCIL_EMAIL, "subject": subject, "body": body, "mailto": mailto}
+    to = CITY_COUNCIL_EMAIL if recipient == "council" else CITY_311_EMAIL
+    cc = CITY_COUNCIL_EMAIL if recipient == "both" else ""
+    params = {"subject": subject, "body": body}
+    if cc:
+        params["cc"] = cc
+    mailto = f"mailto:{to}?" + urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+    return {"to": to, "cc": cc, "subject": subject, "body": body, "mailto": mailto}
 
 
 def prepare_report(group: str, description: str, lat: float, lon: float, address: str | None,
-                   noticed: str = "", extra: str = "") -> dict:
+                   noticed: str = "", extra: str = "", checked_clear: bool = True) -> dict:
     """Everything the resident needs to file on Boston's official 311 site, ready to paste."""
     where = address or f"{lat:.5f}, {lon:.5f}"
     lines = [f"Issue: {group}", f"Location: {where}", f"Coordinates: {lat:.5f}, {lon:.5f}"]
@@ -262,6 +269,7 @@ def prepare_report(group: str, description: str, lat: float, lon: float, address
         lines.append(f"First noticed: {noticed}")
     if extra:
         lines.append(f"More detail: {extra}")
-    lines.append("No existing open case was found within 400 m for this issue (checked against City of Boston open data).")
+    if checked_clear:
+        lines.append("No matching case was found within 400 m in the City of Boston data snapshot.")
     return {"text": "\n".join(lines), "file_at": REPORT_URL,
             "map": f"https://www.openstreetmap.org/?mlat={lat:.5f}&mlon={lon:.5f}#map=18/{lat:.5f}/{lon:.5f}"}

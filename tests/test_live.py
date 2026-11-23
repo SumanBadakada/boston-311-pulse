@@ -31,12 +31,12 @@ class LiveMappingTests(unittest.TestCase):
         self.assertTrue(open_rows.resolution_hours.isna().all())
         self.assertTrue((open_rows.resolved == 0).all())
 
-    def test_new_system_rows_convert_utc_and_department(self):
+    def test_new_system_rows_preserve_boston_wall_time_and_map_department(self):
         df = to_clean(raw("new_system", NEW_COLS), "new")
         r = df.iloc[0]
         self.assertEqual(r.case_id, "BCS-00245057")
         self.assertEqual(r.department, "PWDx")          # "Public Works Department (PWD)"
-        self.assertEqual(r.hour, 2)                      # 06:30 UTC = 02:30 Boston (EDT)
+        self.assertEqual(r.hour, 6)                      # Analyze Boston reports local wall time
         self.assertAlmostEqual(r.resolution_hours, 0.8, places=1)
         self.assertEqual(r.request_type, "Litter & Debris")
 

@@ -2,9 +2,10 @@
 
 [![tests](https://github.com/SumanBadakada/boston-311-pulse/actions/workflows/tests.yml/badge.svg)](https://github.com/SumanBadakada/boston-311-pulse/actions/workflows/tests.yml)
 
-**A daily-refreshed operations brief for Boston city managers, built from live 311 service requests.** It answers four questions every Monday: *what's surging, who's falling behind, which neighborhoods are being served worse than they should be, and which problems keep coming back.* An AI writes the summary; every number in it is computed from the data and checked before it's shown.
+**A daily-refreshed operations brief for Boston city managers, built from live 311 service requests.** It answers four questions every Monday: *what's surging, who's falling behind, which neighborhoods are being served worse than they should be, and which problems keep coming back.* Each summary is generated from computed findings and includes downloadable evidence.
 
-**Today's brief: [sumanbadakada.github.io/boston-311-pulse](https://sumanbadakada.github.io/boston-311-pulse/)** · refreshed every morning from live city data  
+**Published briefs:** [Daily](https://sumanbadakada.github.io/boston-311-pulse/daily.html) · [Weekly](https://sumanbadakada.github.io/boston-311-pulse/)
+
 **Interactive app: [boston-311-pulse.streamlit.app](https://boston-311-pulse.streamlit.app/)**
 
 ![311 Pulse brief for the week ending 2025-12-31](docs/brief.png)
@@ -13,9 +14,15 @@
 
 Boston logs hundreds of thousands of 311 requests a year. Dashboards show what happened; a manager starting the week needs to know what to act on. This started as a team Tableau analysis for *Analytics for Managers* at BU Questrom, comparing each neighborhood's on-time rate with what its request mix predicts. 311 Pulse turns that one-off analysis into a tool that runs on any week and says what changed.
 
+## Explore service requests
+
+Search by case number or address and combine filters for issue type, department, neighborhood, opening date, status and overdue status. The map and table use the same filters. Select a case to see available city notes and photos, its timeline and open or recently closed cases nearby. Likely duplicates share an issue type or issue family. Follow-up drafts can go to 311, the district councilor through the City Council inbox, or both.
+
+Daily and weekly briefs use their own reporting windows and the prior four weeks as the volume baseline. Backlog is measured at the end of the selected day. Neighborhood gaps and repeat hotspots use 30-day windows. Open a finding's evidence in the app or download a ZIP from the published brief. Evidence includes case numbers, the observed and baseline rows, and the case-level inputs to the calculation. Older rows in the snapshot cover still-open cases only, up to 180 days.
+
 ## For residents: is this already reported?
 
-Upload a photo of a problem in a public space:
+Upload a photo or describe a problem in a public space:
 
 1. **Gemini reads the photo** and names the issue (pothole, streetlight, graffiti, dumping...), with a one-line description a crew could act on. The resident can always correct it.
 2. **Location** comes from the photo's GPS; if the browser stripped it, the resident types an address (geocoded with OpenStreetMap, limited to Boston).
@@ -68,13 +75,11 @@ The method is deliberately simple: empirical quantiles of real past cases, no bl
 
 ## Live data, refreshed every morning
 
-A GitHub Actions job runs at about 7am Boston time. It pulls the last six weeks of requests from the City's open data API, builds the brief, publishes it to GitHub Pages, and saves the data for the Streamlit app.
+The daily GitHub Actions workflow runs at 11:17 UTC and can also be run manually. It publishes both briefs and evidence archives to GitHub Pages and saves the shared snapshot for Streamlit.
 
-Boston is mid-way through moving 311 to a new system, so recent cases live in **two datasets with different columns**. `pulse/live.py` queries both, maps them onto one schema (UTC timestamps converted to Boston time, new-system department and neighborhood names folded into the legacy groupings), and computes each request type's expected on-time rate over the past year with a server-side SQL aggregate instead of downloading a year of rows. The *data check* section exists because of this transition: it flags types that vanish from the data, which usually means a type moved systems, not that the problem went away.
+Analyze Boston supplies the legacy and new-system case records. Its timestamps are expressed in Boston local time. New yearly resources are discovered from the city catalog, data is pulled by stable row ID, and the refresh guards against a major drop in recent case coverage. The two public datasets remain the source for case counts and service targets. Open311 timestamps are converted from UTC. Its bounded recent feed adds public photos and updates only for an exact case ID or a unique match on the opening second, address, coordinates and issue type. Cases without matching media show the available city record. Failed or rate-limited calls have bounded retries and respect `Retry-After`. A failed primary refresh keeps the last published snapshot.
 
-## Keeping the AI honest
-
-The AI never computes. `pulse/engine.py` produces every figure with pandas. `pulse/writer.py` sends only those facts to the model (Gemini's free tier by default, or Claude), then extracts every number from the draft and checks it against the facts. **If any number can't be traced, the draft is thrown away** and a deterministic template brief is used instead. The same check guards follow-up questions in the app. Without an API key the template writer runs, so the tool always works.
+Published summaries use the computed figures directly. Optional AI wording for local briefs and app follow-up questions retains the existing number check.
 
 ## Run it
 
@@ -82,17 +87,17 @@ The AI never computes. `pulse/engine.py` produces every figure with pandas. `pul
 pip install -r requirements.txt
 
 python -m pulse.live                           # pull the last 6 weeks of live data
-python -m pulse --data data/live_311.csv.gz    # HTML brief for the latest full week
-streamlit run app.py                           # interactive: pick a week, map, follow-up questions
+python -m pulse --data data/live_311.csv.gz --period daily  # latest daily HTML brief
+streamlit run app.py                           # requests, resident reporting, and briefs
 
 export GEMINI_API_KEY=...                      # optional, free tier: AI-written brief and Q&A
 ```
 
-Without a key everything works and the summary uses the built-in template. `data/sample_311.csv.gz` (68K requests, Sept to Dec 2025, from the course dataset) is the fallback when no live file exists.
+Without a key, photo reporting supports manual issue selection and briefs use the computed summary. `data/sample_311.csv.gz` (68K requests, Sept to Dec 2025, from the course dataset) is the fallback when no live file exists.
 
 ## Hosting
 
-- **Daily brief:** GitHub Pages, published by `.github/workflows/daily.yml`. Add `GEMINI_API_KEY` under *Settings → Secrets → Actions* for the AI summary.
+- **Daily brief:** GitHub Pages, published by `.github/workflows/daily.yml`.
 - **Interactive app:** Streamlit Community Cloud from this repo's `app.py`, with `GEMINI_API_KEY` in the app's Secrets. Follow-up questions are capped per visitor to protect the free quota.
 
 ## How it's built

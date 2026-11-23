@@ -14,6 +14,9 @@ from . import issues, predict
 
 
 def _closed_at(row) -> pd.Timestamp | None:
+    closed = pd.to_datetime(row.get("closed_at"), errors="coerce")
+    if pd.notna(closed):
+        return closed
     if row.case_status != "Closed" or pd.isna(row.resolution_hours):
         return None
     return row.open_date + pd.Timedelta(hours=float(row.get("hour", 0) or 0) + float(row.resolution_hours))
