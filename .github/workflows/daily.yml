@@ -18,15 +18,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install pandas numpy google-genai
-      - name: Pull the last 6 weeks of 311 data
+      - run: pip install pandas numpy
+      - name: Refresh Analyze Boston and Open311
         run: python -m pulse.live --days 42 --out data/live_311.csv.gz
-      - name: Build the brief
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Build daily and weekly briefs and evidence
         run: |
           mkdir -p site
-          python -m pulse --data data/live_311.csv.gz --out site/index.html
+          python -m pulse --data data/live_311.csv.gz --period weekly --published --out site/index.html
+          python -m pulse --data data/live_311.csv.gz --period daily --published --out site/daily.html
       - name: Save the data for the Streamlit app
         run: |
           git config user.name "github-actions"
